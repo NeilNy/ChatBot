@@ -169,6 +169,7 @@ const toWireBody = (body: CreateMessageRequest): Record<string, unknown> => {
         : message
     ),
     thinking: body.thinking,
+    ...(body.tools.length > 0 ? { tools: body.tools } : {}),
     stream: true,
   }
 }

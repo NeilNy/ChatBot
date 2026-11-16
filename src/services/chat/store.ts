@@ -1,8 +1,15 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { CHAT_MODEL, IS_OPENCODE } from '../api/provider.js'
-import type { ChatModel, CreateMessageRequest } from '../api/types.js'
+import { CHAT_MODEL, CLIENT_SEARCH_TOOL, IS_OPENCODE } from '../api/provider.js'
+import { searchWeb, type SearchResult } from '../api/search.js'
+import type {
+  AssistantBlockParam,
+  ChatModel,
+  CreateMessageRequest,
+  MessageParam,
+  WebSearchResult,
+} from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
@@ -48,6 +55,10 @@ const FILE_RETRY_BASE_DELAY = 1000
 
 /** 阅读链接始终开启，智能搜索开关控制是否另行声明搜索工具（含边想边搜）。 */
 const serverTools = (search: boolean): CreateMessageRequest['tools'] => {
+  // OpenCode Go 只支持标准客户端工具，搜索由前端执行 /search 后回传 tool_result
+  if (IS_OPENCODE) {
+    return search ? [CLIENT_SEARCH_TOOL] : []
+  }
   const tools: CreateMessageRequest['tools'] = [
     { type: 'deepseek_read_url', name: 'deepseek_read_url' },
   ]
@@ -980,6 +991,44 @@ const applyLocalTitle = (sessionId: string) => {
   )
 }
 
+/** 单条回复最多执行几次客户端联网搜索，避免模型无限调用 */
+const MAX_SEARCH_ROUNDS = 3
+/** 回传给模型的搜索结果上限，防止上下文膨胀 */
+const MAX_TOOL_RESULT_CHARS = 12000
+
+/** 把搜索代理的结果转换成 SearchPanel 可渲染的 web_search_result 块 */
+const toSearchDisplayResults = (results: SearchResult[]): WebSearchResult[] =>
+  results.map((result) => ({
+    type: 'web_search_result',
+    title: result.title || result.url,
+    url: result.url,
+    snippet: result.snippet,
+    site_icon: null,
+    site_name: result.site || null,
+    encrypted_content: '',
+    page_age: result.published || null,
+  }))
+
+/** 回传给模型的 tool_result 文本 */
+const toToolResultText = (results: SearchResult[]): string => {
+  if (results.length === 0) {
+    return '没有搜索到相关结果，请直接告诉用户未能获取实时信息。'
+  }
+  const payload = JSON.stringify(
+    results.map(({ title, url, snippet, site, published }) => ({
+      title,
+      url,
+      snippet,
+      site,
+      published,
+    }))
+  )
+  return `联网搜索结果（请基于这些结果回答，引用时保留链接）：\n${payload}`.slice(
+    0,
+    MAX_TOOL_RESULT_CHARS
+  )
+}
+
 /**
  * 请求并消费流：先补齐附件的 serverId，再发请求；流式增量按动画帧刷新内存，完成、失败或停止后落盘。
  * 补传失败时回复记为 upload 错误，可重试。
@@ -1015,47 +1064,181 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         reply = { ...reply, latestReminder }
         updateReply(sessionId, reply)
         persist(sessionId)
-        const messages = toRequestMessages(
+        const messages: MessageParam[] = toRequestMessages(
           prepared.history,
           prepared.question,
           prepared.prefix,
           initial.thinking ?? false,
           latestReminder
         )
-        const events = streamMessage(
-          useSettings.getState().apiKey ?? '',
-          {
-            model: initial.model ?? MODEL,
-            system: SYSTEM_PROMPT,
-            messages,
-            thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
-            safety_check: SAFETY_CHECK,
-            tools: serverTools(initial.search ?? false),
-            ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
-          },
-          controller.signal
-        )
+        const apiKey = useSettings.getState().apiKey ?? ''
         const blockIndexes = new Map<number, number>()
-        for await (const event of events) {
-          receivedContent ||= event.type === 'content_block_start'
-          if (
-            event.type === 'message_delta' &&
-            (event.delta.stop_reason === 'end_turn' || event.delta.stop_reason === 'max_tokens') &&
-            event.delta.title?.trim() &&
-            titleRequests.has(controller) &&
-            !controller.signal.aborted &&
-            !get().importingHistory
-          ) {
-            const title = event.delta.title.trim()
-            updateSession(sessionId, (session) => (session.title ? session : { ...session, title }))
-            titleRequests.delete(controller)
+        // 客户端工具循环：OpenCode Go 的 search_web 可能连续调用多次
+        for (let round = 0; ; round += 1) {
+          const allowClientTool =
+            IS_OPENCODE && (initial.search ?? false) && round < MAX_SEARCH_ROUNDS
+          const tools = IS_OPENCODE
+            ? allowClientTool
+              ? serverTools(true)
+              : []
+            : serverTools(initial.search ?? false)
+          let pendingTool: {
+            id: string
+            name: string
+            json: string
+            input: unknown
+          } | null = null
+          let roundText = ''
+          const events = streamMessage(
+            apiKey,
+            {
+              model: initial.model ?? MODEL,
+              system: SYSTEM_PROMPT,
+              messages,
+              thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
+              safety_check: SAFETY_CHECK,
+              tools,
+              ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
+            },
+            controller.signal
+          )
+          for await (const event of events) {
+            receivedContent ||= event.type === 'content_block_start'
+            if (
+              event.type === 'content_block_start' &&
+              event.content_block.type === 'tool_use'
+            ) {
+              pendingTool = {
+                id: event.content_block.id,
+                name: event.content_block.name,
+                json: '',
+                input: event.content_block.input,
+              }
+            } else if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'input_json_delta' &&
+              pendingTool
+            ) {
+              pendingTool.json += event.delta.partial_json
+            } else if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta'
+            ) {
+              roundText += event.delta.text
+            }
+            if (
+              event.type === 'message_delta' &&
+              (event.delta.stop_reason === 'end_turn' ||
+                event.delta.stop_reason === 'max_tokens') &&
+              event.delta.title?.trim() &&
+              titleRequests.has(controller) &&
+              !controller.signal.aborted &&
+              !get().importingHistory
+            ) {
+              const title = event.delta.title.trim()
+              updateSession(sessionId, (session) =>
+                session.title ? session : { ...session, title }
+              )
+              titleRequests.delete(controller)
+            }
+            reply = applyEvent(reply, event, Date.now(), blockIndexes)
+            if (document.visibilityState === 'hidden') {
+              flush()
+            } else {
+              frame ||= requestAnimationFrame(flush)
+            }
           }
-          reply = applyEvent(reply, event, Date.now(), blockIndexes)
-          if (document.visibilityState === 'hidden') {
-            flush()
-          } else {
-            frame ||= requestAnimationFrame(flush)
+
+          if (!pendingTool || !allowClientTool) {
+            break
           }
+
+          let input: Record<string, unknown> = {}
+          try {
+            input = JSON.parse(pendingTool.json || '{}') as Record<string, unknown>
+          } catch {
+            input =
+              pendingTool.input && typeof pendingTool.input === 'object'
+                ? (pendingTool.input as Record<string, unknown>)
+                : {}
+          }
+          const query =
+            typeof input.query === 'string' ? input.query.trim().slice(0, 200) : ''
+          if (!query) {
+            break
+          }
+
+          // 先插入搜索调用块，SearchPanel 在结果到达前显示「搜索中」
+          const toolUseId = `local_${pendingTool.id}`
+          reply = {
+            ...reply,
+            blocks: [
+              ...reply.blocks,
+              {
+                type: 'server_tool_use',
+                id: toolUseId,
+                name: 'deepseek_web_search',
+                input: { action: 'search', queries: [query] },
+                caller: { type: 'direct' },
+                kind: 'search',
+              },
+            ],
+          }
+          updateReply(sessionId, reply)
+          persist(sessionId)
+
+          let results: SearchResult[] = []
+          try {
+            results = await searchWeb(query, controller.signal)
+          } catch {
+            results = []
+          }
+
+          reply = {
+            ...reply,
+            blocks: [
+              ...reply.blocks,
+              {
+                type: 'web_search_tool_result',
+                tool_use_id: toolUseId,
+                content:
+                  results.length > 0
+                    ? toSearchDisplayResults(results)
+                    : [
+                        {
+                          type: 'web_search_tool_result_error',
+                          error_code: 'unavailable',
+                        },
+                      ],
+                kind: 'search',
+              },
+            ],
+          }
+          updateReply(sessionId, reply)
+          persist(sessionId)
+
+          const assistantContent: AssistantBlockParam[] = []
+          if (roundText.trim()) {
+            assistantContent.push({ type: 'text', text: roundText })
+          }
+          assistantContent.push({
+            type: 'tool_use',
+            id: pendingTool.id,
+            name: pendingTool.name,
+            input,
+          })
+          messages.push({ role: 'assistant', content: assistantContent })
+          messages.push({
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: pendingTool.id,
+                content: toToolResultText(results),
+                is_error: results.length === 0,
+              },
+            ],
+          })
         }
         reply = settleReply(reply, 'done', Date.now())
         break

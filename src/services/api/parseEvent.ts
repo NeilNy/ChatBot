@@ -160,6 +160,9 @@ const readDelta = (value: unknown): ContentBlockDelta | null => {
       return isString(value.signature) ? (value as ContentBlockDelta) : null
     case 'citations_delta':
       return isCitation(value.citation) ? (value as ContentBlockDelta) : null
+    case 'input_json_delta':
+      // 客户端工具的参数分片；回复归并层不展示，但工具循环需要完整 JSON
+      return isString(value.partial_json) ? (value as ContentBlockDelta) : null
     default:
       return null
   }

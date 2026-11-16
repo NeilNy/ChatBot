@@ -28,13 +28,37 @@ export const OPENCODE_ONLY_MODEL = 'deepseek-v4.1-flash'
 /** 实际用于对话的模型：OpenCode 环境锁定，避免历史记录或构建参数切到其他模型 */
 export const CHAT_MODEL = IS_OPENCODE ? OPENCODE_ONLY_MODEL : DEFAULT_MODEL
 
-/** OpenCode Go 不支持 Files API 与 DeepSeek 服务端工具，界面相应隐藏入口 */
+import type { ClientTool } from './types.js'
+
+/** OpenCode Go 不支持 Files API 与 DeepSeek 服务端工具，附件/语音入口隐藏；搜索改走客户端工具循环 */
 export const SUPPORTS_ATTACHMENTS = !IS_OPENCODE
-export const SUPPORTS_SEARCH = !IS_OPENCODE
+export const SUPPORTS_SEARCH = true
 export const SUPPORTS_SPEECH = !IS_OPENCODE
 
 /** 由反向代理注入密钥时，设置里不展示、也不允许修改 API Key */
 export const SHOW_API_KEY_SETTINGS = !API_PROVIDER.proxyMode
+
+/** 同源搜索代理地址，开发环境由 rspack devServer 代理 */
+export const SEARCH_URL = `${API_PROVIDER.origin}/search`
+
+/** OpenCode Go 的联网搜索工具，由前端执行后把结果回传给模型 */
+export const CLIENT_SEARCH_TOOL: ClientTool = {
+  name: 'search_web',
+  description:
+    'Search the web for current information. Use it for news, weather, prices, policies, ' +
+    'or any fact that may have changed recently. Return a short search query in the ' +
+    "user's language.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Search query, 1-100 characters, keep only the core entities',
+      },
+    },
+    required: ['query'],
+  },
+}
 
 const SESSION_STORAGE_KEY = 'chat-demo:opencode-session'
 let memorySessionId = ''
