@@ -1,6 +1,6 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
 import { readMessageEvent } from './parseEvent.js'
-import { API_BASE_URL, IS_OPENCODE, VERIFY_URL, opencodeSessionId } from './provider.js'
+import { API_BASE_URL, IS_OPENCODE, OPENCODE_ONLY_MODEL, VERIFY_URL, opencodeSessionId } from './provider.js'
 import { readServerSentEvents } from './sse.js'
 import type {
   ApiErrorBody,
@@ -160,7 +160,8 @@ const toWireBody = (body: CreateMessageRequest): Record<string, unknown> => {
     return { ...body, stream: true }
   }
   return {
-    model: body.model,
+    // OpenCode Go 只允许 DeepSeek V4.1 Flash 1017，忽略会话快照或构建参数里的其他模型
+    model: OPENCODE_ONLY_MODEL,
     system: body.system,
     messages: body.messages.map((message) =>
       message.role === 'latest_reminder'

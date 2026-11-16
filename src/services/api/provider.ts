@@ -19,6 +19,15 @@ export const VERIFY_URL = `${API_PROVIDER.origin}${API_PROVIDER.verifyPath}`
 /** 默认聊天模型 */
 export const DEFAULT_MODEL = API_PROVIDER.model
 
+/**
+ * OpenCode Go 部署固定使用的模型：DeepSeek V4.1 Flash 1017。
+ * 网关的模型 id 为 deepseek-v4.1-flash，canonical id 为 deepseek/deepseek-v4.1-flash-1017。
+ */
+export const OPENCODE_ONLY_MODEL = 'deepseek-v4.1-flash'
+
+/** 实际用于对话的模型：OpenCode 环境锁定，避免历史记录或构建参数切到其他模型 */
+export const CHAT_MODEL = IS_OPENCODE ? OPENCODE_ONLY_MODEL : DEFAULT_MODEL
+
 /** OpenCode Go 不支持 Files API 与 DeepSeek 服务端工具，界面相应隐藏入口 */
 export const SUPPORTS_ATTACHMENTS = !IS_OPENCODE
 export const SUPPORTS_SEARCH = !IS_OPENCODE

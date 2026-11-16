@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { DEFAULT_MODEL, IS_OPENCODE } from '../api/provider.js'
+import { CHAT_MODEL, IS_OPENCODE } from '../api/provider.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
@@ -33,8 +33,8 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** 默认模型由构建配置决定；深度思考与图片输入能力以服务端为准 */
-const MODEL: ChatModel = DEFAULT_MODEL
+/** 默认模型由构建配置决定；OpenCode 环境固定为 DeepSeek V4.1 Flash 1017 */
+const MODEL: ChatModel = CHAT_MODEL
 /** 所有生成请求统一携带的助手身份说明 */
 const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
