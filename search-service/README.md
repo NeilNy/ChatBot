@@ -68,7 +68,10 @@ PA_VERIFY_PATH='/api/models' \
 PA_API_VENDOR=opencode \
 PA_PROXY_MODE=true \
 PA_CHAT_MODEL='deepseek-v4.1-flash' \
+PA_PUBLIC_PATH='/' \
 pnpm build
 ```
+
+`PA_PUBLIC_PATH=/` 让资源使用 `/static/...` 绝对路径，配合 nginx 的 `try_files ... /index.html` 支持会话深链接 `/a/chat/s/<session-id>`；默认 `auto` 保留上游的 `file://` 用法。
 
 前端声明 `search_web` 客户端工具；模型返回 `tool_use` 后，浏览器调用 `/search`，再把 `tool_result` 回传给模型继续生成。单条回复最多执行 3 次搜索。

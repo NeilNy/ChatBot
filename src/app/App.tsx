@@ -5,10 +5,12 @@ import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport
 import {
   bindChatPersistence,
   initChat,
+  newChat,
   retrySaveSessions,
   selectSession,
   useChatStore,
 } from '../services/chat/store.js'
+import { sessionIdFromLocation, writeSessionUrl } from '../services/chat/sessionUrl.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
 import { closeSearchPanel } from '../components/search/searchPanelState.js'
 import { SessionView } from '../components/session/SessionView.js'
@@ -68,9 +70,68 @@ export const App = () => {
   useEffect(closeMobileSider, [activeId, isMobile])
 
   useEffect(() => {
-    void initChat()
+    let disposed = false
+    void (async () => {
+      try {
+        await initChat()
+      } catch {
+        return
+      }
+      if (disposed) {
+        return
+      }
+      // 深链接：/a/chat/s/<id>，会话列表加载完成后再切换
+      const id = sessionIdFromLocation()
+      if (id === null) {
+        return
+      }
+      if (useChatStore.getState().sessions.some((session) => session.id === id)) {
+        selectSession(id)
+      } else {
+        writeSessionUrl(null, true)
+        showToast({ key: 'sessionNotFound' })
+      }
+    })()
     // 首次打开先在设置里输入 API Key
     ensureApiKey()
+    return () => {
+      disposed = true
+    }
+  }, [])
+
+  // 会话切换时同步地址栏，并支持浏览器前进/后退
+  useEffect(() => {
+    let last = useChatStore.getState().activeId
+    let applyingHistory = false
+    const unsubscribe = useChatStore.subscribe((state) => {
+      if (state.activeId === last) {
+        return
+      }
+      last = state.activeId
+      if (!applyingHistory) {
+        writeSessionUrl(last)
+      }
+    })
+    const onPopState = () => {
+      applyingHistory = true
+      const id = sessionIdFromLocation()
+      if (id !== null && useChatStore.getState().sessions.some((session) => session.id === id)) {
+        selectSession(id)
+      } else if (id === null) {
+        newChat()
+      } else {
+        newChat()
+        writeSessionUrl(null, true)
+      }
+      window.setTimeout(() => {
+        applyingHistory = false
+      }, 0)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('popstate', onPopState)
+    }
   }, [])
 
   return (

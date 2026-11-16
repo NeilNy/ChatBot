@@ -32,6 +32,8 @@ type ConfigOptions = {
   proxyMode?: boolean
   /** 默认聊天模型 */
   chatModel?: string
+  /** 静态资源前缀；默认 auto 以兼容 file://，路径路由部署时设为 / */
+  publicPath?: string
   /** 开发服务器配置，支持本地接口代理 */
   devServer?: Configuration['devServer']
 }
@@ -46,14 +48,15 @@ export const createConfig = ({
   apiVendor = env('PA_API_VENDOR', 'deepseek') as ApiVendor,
   proxyMode = env('PA_PROXY_MODE', 'false') === 'true',
   chatModel = env('PA_CHAT_MODEL', 'deepseek-flash'),
+  publicPath = env('PA_PUBLIC_PATH', 'auto'),
   devServer,
 }: ConfigOptions = {}): Configuration => ({
   mode: dev ? 'development' : 'production',
   entry: './src/main.tsx',
   output: {
     path: path.resolve(root, 'dist'),
-    // 运行时按当前脚本地址推导资源路径，file:// 下异步 chunk、字体都按相对位置加载
-    publicPath: 'auto',
+    // 默认按脚本地址推导；SPA 路径路由（/a/chat/s/<id>）需要绝对前缀 /
+    publicPath,
     filename: 'static/js/[name].[contenthash:8].js',
     chunkFilename: 'static/js/async/[name].[contenthash:8].js',
     cssFilename: 'static/css/[name].[contenthash:8].css',
