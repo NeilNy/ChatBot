@@ -23,12 +23,14 @@ import {
   isChineseBrowser,
   setLocale,
   setLocation,
+  setSystemPrompt,
   setThemePreference,
   setTtsVoice,
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
+import { defaultSystemPrompt } from '../../services/chat/systemPrompt.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
@@ -101,6 +103,7 @@ const SettingsContent = () => {
               <LocaleSetting />
               <TtsVoiceSetting />
               <LocationSetting />
+              <SystemPromptSetting />
             </>
           ) : (
             <>
@@ -269,6 +272,63 @@ const LocationSetting = () => {
         </div>
       }
     />
+  )
+}
+
+/** 系统提示词：自定义后每次请求原样发送；留空或恢复默认时使用内置提示词 */
+const SystemPromptSetting = () => {
+  const t = useTranslate()
+  const thinking = useSettings((state) => state.thinking)
+  const saved = useSettings((state) => state.systemPrompt)
+  const fallback = defaultSystemPrompt(thinking)
+  const [value, setValue] = useState(saved ?? fallback)
+  const normalized = value.trim() ? value : null
+  const dirty =
+    normalized === null ? saved !== null : normalized !== (saved ?? fallback)
+
+  const save = () => {
+    const next = value.trim() ? value : null
+    setSystemPrompt(next)
+    setValue(next ?? fallback)
+  }
+
+  const reset = () => {
+    setSystemPrompt(null)
+    setValue(fallback)
+  }
+
+  return (
+    <div className={styles.prompt}>
+      <div className={styles.label}>{t('systemPromptTitle')}</div>
+      <div className={styles.description}>{t('systemPromptDescription')}</div>
+      <textarea
+        className={styles.promptInput}
+        value={value}
+        rows={5}
+        maxLength={8000}
+        spellCheck={false}
+        aria-label={t('systemPromptTitle')}
+        placeholder={t('systemPromptPlaceholder')}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <div className={styles.promptFooter}>
+        <span className={styles.description}>
+          {dirty
+            ? t('systemPromptUnsaved')
+            : saved
+              ? t('systemPromptCustomHint')
+              : t('systemPromptDefaultHint')}
+        </span>
+        <div className={styles.promptActions}>
+          <Button variant="outlined" size="m" onClick={reset}>
+            {t('systemPromptReset')}
+          </Button>
+          <Button variant="primary" size="m" disabled={!dirty} onClick={save}>
+            {t('systemPromptSave')}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 

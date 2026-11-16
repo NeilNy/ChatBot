@@ -17,6 +17,7 @@ type Settings = {
   ttsVoice: TtsVoice
   thinking: boolean
   search: boolean
+  systemPrompt: string | null
   siderCollapsed: boolean
 }
 
@@ -28,6 +29,7 @@ const KEYS = {
   ttsVoice: 'chat-demo:tts-voice',
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
+  systemPrompt: 'chat-demo:system-prompt',
   siderCollapsed: 'chat-demo:sider-collapsed',
 } as const
 
@@ -88,6 +90,12 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+/** 自定义系统提示词；空白内容视为未设置 */
+const initialSystemPrompt = (): string | null => {
+  const saved = read(KEYS.systemPrompt)
+  return saved?.trim() ? saved : null
+}
+
 /** 代理模式由服务端注入密钥，前端只保留占位值，并清除历史遗留的真实 Key */
 const initialApiKey = (): string | null => {
   if (API_PROVIDER.proxyMode) {
@@ -105,6 +113,7 @@ export const useSettings = create<Settings>(() => ({
   ttsVoice: initialTtsVoice(),
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
+  systemPrompt: initialSystemPrompt(),
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
 }))
 
@@ -142,6 +151,13 @@ export const setThinking = (thinking: boolean) => {
 export const setSearch = (search: boolean) => {
   write(KEYS.search, String(search))
   useSettings.setState({ search })
+}
+
+/** 空字符串表示恢复内置默认提示词 */
+export const setSystemPrompt = (systemPrompt: string | null) => {
+  const value = systemPrompt?.trim() ? systemPrompt : null
+  write(KEYS.systemPrompt, value)
+  useSettings.setState({ systemPrompt: value })
 }
 
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
