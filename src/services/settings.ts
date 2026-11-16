@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { TtsVoice } from './api/speech.js'
+import { API_PROVIDER } from './api/provider.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
 export type Locale = 'zh-CN' | 'en-US'
@@ -87,8 +88,17 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+/** 代理模式由服务端注入密钥，前端只保留占位值，并清除历史遗留的真实 Key */
+const initialApiKey = (): string | null => {
+  if (API_PROVIDER.proxyMode) {
+    write(KEYS.apiKey, null)
+    return 'proxy'
+  }
+  return read(KEYS.apiKey)
+}
+
 export const useSettings = create<Settings>(() => ({
-  apiKey: read(KEYS.apiKey),
+  apiKey: initialApiKey(),
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),

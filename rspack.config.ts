@@ -16,16 +16,36 @@ const cssLoader = {
   options: { targets },
 }
 
+/** API 服务类型：deepseek 为原生兼容接口，opencode 为 OpenCode Go 网关 */
+type ApiVendor = 'deepseek' | 'opencode'
+
 type ConfigOptions = {
-  /** 公开 API 的地址，注入为 __API_ORIGIN__ */
+  /** 公开 API 的地址，注入为 __API_PROVIDER__.origin */
   apiOrigin?: string
+  /** API 路径前缀：DeepSeek 为 /anthropic/v1，OpenCode Go 为 /v1（或同源代理的 /api） */
+  apiBasePath?: string
+  /** 校验 API Key 的路径：DeepSeek 为 /models，OpenCode Go 为 /v1/models */
+  verifyPath?: string
+  /** 网关类型，决定请求头与是否剥离 DeepSeek 扩展字段 */
+  apiVendor?: ApiVendor
+  /** 由同源反向代理注入密钥时，前端使用占位 Key 且不要求用户填写 */
+  proxyMode?: boolean
+  /** 默认聊天模型 */
+  chatModel?: string
   /** 开发服务器配置，支持本地接口代理 */
   devServer?: Configuration['devServer']
 }
 
+const env = (name: string, fallback: string) => process.env[name] ?? fallback
+
 /** 创建构建配置，支持自定义 API 地址和开发服务器选项 */
 export const createConfig = ({
-  apiOrigin = 'https://api.deepseek.com',
+  apiOrigin = env('PA_API_ORIGIN', 'https://api.deepseek.com'),
+  apiBasePath = env('PA_API_BASE_PATH', '/anthropic/v1'),
+  verifyPath = env('PA_VERIFY_PATH', '/models'),
+  apiVendor = env('PA_API_VENDOR', 'deepseek') as ApiVendor,
+  proxyMode = env('PA_PROXY_MODE', 'false') === 'true',
+  chatModel = env('PA_CHAT_MODEL', 'deepseek-flash'),
   devServer,
 }: ConfigOptions = {}): Configuration => ({
   mode: dev ? 'development' : 'production',
@@ -80,7 +100,16 @@ export const createConfig = ({
       scriptLoading: 'defer',
       meta: { 'application-version': version },
     }),
-    new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
+    new rspack.DefinePlugin({
+      __API_PROVIDER__: JSON.stringify({
+        vendor: apiVendor,
+        origin: apiOrigin,
+        apiBasePath,
+        verifyPath,
+        proxyMode,
+        model: chatModel,
+      }),
+    }),
     new rspack.CopyRspackPlugin({
       patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
     }),

@@ -1,5 +1,6 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
 import { readMessageEvent } from './parseEvent.js'
+import { API_BASE_URL, IS_OPENCODE, VERIFY_URL, opencodeSessionId } from './provider.js'
 import { readServerSentEvents } from './sse.js'
 import type {
   ApiErrorBody,
@@ -10,9 +11,11 @@ import type {
 } from './types.js'
 
 /** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
-export const API_ORIGIN = __API_ORIGIN__
+export const API_ORIGIN = __API_PROVIDER__.origin
 /** Anthropic 兼容接口的前缀 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
+const ANTHROPIC_BASE_URL = API_BASE_URL
+/** Anthropic Messages API 版本，OpenCode Go 要求显式携带 */
+const ANTHROPIC_VERSION = '2023-06-01'
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
 
@@ -85,15 +88,25 @@ export const request = async (url: string, init: RequestInit): Promise<Response>
 const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string> => ({
   // DeepSeek 兼容接口的鉴权方式，也可使用 Authorization: Bearer。
   'x-api-key': apiKey,
+  // OpenCode Go 要求显式版本号与稳定的会话标识，缺失 x-opencode-session 会被网关拒绝。
+  ...(IS_OPENCODE
+    ? {
+        'anthropic-version': ANTHROPIC_VERSION,
+        'x-opencode-session': opencodeSessionId(),
+      }
+    : {}),
   // Files API 和通过 file_id 引用图片时必传；纯文本聊天无需携带。
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
 /** 用 GET /models 校验 API Key（不产生费用） */
 export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
-  await request(`${API_ORIGIN}/models`, {
+  await request(VERIFY_URL, {
     method: 'GET',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      ...(IS_OPENCODE ? { 'x-opencode-session': opencodeSessionId() } : {}),
+    },
     signal,
   })
 }
@@ -138,6 +151,28 @@ const hasFile = (body: CreateMessageRequest) =>
   )
 
 /**
+ * 请求体按网关能力裁剪：
+ * - DeepSeek 原样发送 thinking / tools / safety_check / title 等扩展字段；
+ * - OpenCode Go 只接受标准 Anthropic Messages 字段，latest_reminder 角色降级为 user。
+ */
+const toWireBody = (body: CreateMessageRequest): Record<string, unknown> => {
+  if (!IS_OPENCODE) {
+    return { ...body, stream: true }
+  }
+  return {
+    model: body.model,
+    system: body.system,
+    messages: body.messages.map((message) =>
+      message.role === 'latest_reminder'
+        ? { role: 'user', content: message.content }
+        : message
+    ),
+    thinking: body.thinking,
+    stream: true,
+  }
+}
+
+/**
  * POST /anthropic/v1/messages（stream: true），逐个产出流式事件，收到 message_stop 时结束。
  * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
  */
@@ -153,7 +188,7 @@ export async function* streamMessage(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ ...body, stream: true }),
+    body: JSON.stringify(toWireBody(body)),
     signal,
   })
   const contentType = response.headers.get('Content-Type') ?? ''

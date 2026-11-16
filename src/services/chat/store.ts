@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
+import { DEFAULT_MODEL, IS_OPENCODE } from '../api/provider.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
@@ -32,8 +33,8 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** deepseek-flash 同时支持深度思考与图片输入 */
-const MODEL: ChatModel = 'deepseek-flash'
+/** 默认模型由构建配置决定；深度思考与图片输入能力以服务端为准 */
+const MODEL: ChatModel = DEFAULT_MODEL
 /** 所有生成请求统一携带的助手身份说明 */
 const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
@@ -955,6 +956,31 @@ const waitForRetry = (attempt: number, signal: AbortSignal) =>
   })
 
 /**
+ * OpenCode Go 不支持服务端标题扩展，成功后用首条提问在本地生成标题。
+ * 已有标题（手动重命名或历史导入）时保持不动。
+ */
+const applyLocalTitle = (sessionId: string) => {
+  if (!IS_OPENCODE) {
+    return
+  }
+  const session = getSession(sessionId)
+  if (!session || session.title) {
+    return
+  }
+  const first = session.messages.find(
+    (message): message is UserMessage =>
+      message.role === 'user' && message.content.trim() !== ''
+  )
+  if (!first) {
+    return
+  }
+  const title = first.content.trim().replace(/\s+/g, ' ').slice(0, 40)
+  updateSession(sessionId, (current) =>
+    current.title ? current : { ...current, title }
+  )
+}
+
+/**
  * 请求并消费流：先补齐附件的 serverId，再发请求；流式增量按动画帧刷新内存，完成、失败或停止后落盘。
  * 补传失败时回复记为 upload 错误，可重试。
  * 服务端判定 file_id 失效时重新补传后重发，退避重试且次数有上限，超过则按原始报错收尾。
@@ -1083,6 +1109,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
     titleRequests.delete(controller)
     streamFlushes.delete(sessionId)
     cancelAnimationFrame(frame)
+    if (reply.status === 'done') {
+      applyLocalTitle(sessionId)
+    }
     updateReply(sessionId, reply)
     set((state) => ({
       streaming: Object.fromEntries(

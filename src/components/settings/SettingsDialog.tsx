@@ -16,6 +16,7 @@ import {
   importHistory,
 } from '../../services/chat/backup.js'
 import { useIsMobile } from '../../app/viewport.js'
+import { SHOW_API_KEY_SETTINGS } from '../../services/api/provider.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
@@ -103,7 +104,7 @@ const SettingsContent = () => {
             </>
           ) : (
             <>
-              <ApiKeyField editor={apiKeyEditor} />
+              {SHOW_API_KEY_SETTINGS ? <ApiKeyField editor={apiKeyEditor} /> : null}
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
@@ -121,7 +122,9 @@ const SettingsContent = () => {
                   </Button>
                 }
               />
-              {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
+              {isMobile && SHOW_API_KEY_SETTINGS ? (
+                <ApiKeyConfirm editor={apiKeyEditor} />
+              ) : null}
             </>
           )}
         </div>

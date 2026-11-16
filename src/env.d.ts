@@ -5,8 +5,15 @@ declare module '*.module.css' {
 
 declare module '*.css' {}
 
-/** 公开 API 的地址，见 rspack.config.ts 的 createConfig */
-declare const __API_ORIGIN__: string
+/** 构建期注入的 API 服务配置，见 rspack.config.ts 的 createConfig */
+declare const __API_PROVIDER__: {
+  vendor: 'deepseek' | 'opencode'
+  origin: string
+  apiBasePath: string
+  verifyPath: string
+  proxyMode: boolean
+  model: string
+}
 
 /** Prism 语言包通过副作用注册到全局 Prism */
 declare module 'prismjs/components/*' {}
