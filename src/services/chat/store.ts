@@ -43,13 +43,18 @@ import {
 /** 默认模型由构建配置决定；OpenCode 环境固定为 DeepSeek V4.1 Flash 1017 */
 const MODEL: ChatModel = CHAT_MODEL
 /** 所有生成请求统一携带的助手身份说明；OpenCode 工具调用需要显式约束思考语言 */
-const systemPrompt = (): string => {
+const systemPrompt = (thinking: boolean): string => {
   const base = '该助手为DeepSeek，由深度求索公司创造。'
   if (!IS_OPENCODE) {
     return base
   }
   // 工具调用场景下模型容易默认用英文推理，这里按用户提问语言约束思考过程
-  return `${base}内部思考使用与用户提问相同的语言：用户用中文提问时，思考过程和最终回答都使用简体中文，不要用英文思考。`
+  const language =
+    '内部思考使用与用户提问相同的语言：用户用中文提问时，思考过程和最终回答都使用简体中文，不要用英文思考。'
+  // 模型对「嗯呢」这类短消息会偶发跳过思考，开启深度思考时显式要求不要跳过
+  return thinking
+    ? `${base}${language}即使问题很简单，也必须先在思考区写出至少 20 个字的分析并列出判断依据，再回答，不能跳过思考。`
+    : `${base}${language}`
 }
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
@@ -1112,7 +1117,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             apiKey,
             {
               model: initial.model ?? MODEL,
-              system: systemPrompt(),
+              system: systemPrompt(initial.thinking ?? false),
               messages,
               thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
               safety_check: SAFETY_CHECK,

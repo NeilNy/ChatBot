@@ -168,7 +168,11 @@ const toWireBody = (body: CreateMessageRequest): Record<string, unknown> => {
         ? { role: 'user', content: message.content }
         : message
     ),
-    thinking: body.thinking,
+    // 显式预算让模型更稳定地产生思考块（Anthropic 兼容接口接受该字段）
+    thinking:
+      body.thinking.type === 'enabled'
+        ? { type: 'enabled', budget_tokens: 4096 }
+        : body.thinking,
     ...(body.tools.length > 0 ? { tools: body.tools } : {}),
     stream: true,
   }
