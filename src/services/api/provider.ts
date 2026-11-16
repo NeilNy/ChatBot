@@ -45,15 +45,14 @@ export const SEARCH_URL = `${API_PROVIDER.origin}/search`
 export const CLIENT_SEARCH_TOOL: ClientTool = {
   name: 'search_web',
   description:
-    'Search the web for current information. Use it for news, weather, prices, policies, ' +
-    'or any fact that may have changed recently. Return a short search query in the ' +
-    "user's language.",
+    '联网搜索最新信息，适用于新闻、天气、价格、政策或任何可能近期变化的事实。' +
+    '用用户提问的语言返回 1-100 字的搜索词。',
   input_schema: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'Search query, 1-100 characters, keep only the core entities',
+        description: '搜索词，1-100 个字符，只保留核心实体',
       },
     },
     required: ['query'],
