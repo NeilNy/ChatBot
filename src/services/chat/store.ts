@@ -1003,6 +1003,18 @@ const MAX_SEARCH_ROUNDS = 3
 /** 回传给模型的搜索结果上限，防止上下文膨胀 */
 const MAX_TOOL_RESULT_CHARS = 12000
 
+/** 没有站点 Logo 时生成首字母头像，避免搜索结果只显示链接占位图标 */
+const letterIcon = (label: string): string => {
+  const char = (label.trim()[0] || '?').toUpperCase()
+  const safe = char.replace(/[<>&'"]/g, '') || '?'
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+    '<rect width="64" height="64" rx="32" fill="#e8edf7"/>' +
+    `<text x="32" y="43" font-size="30" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" text-anchor="middle" fill="#6b7a99">${safe}</text>` +
+    '</svg>'
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 /** 把搜索代理的结果转换成 SearchPanel 可渲染的 web_search_result 块 */
 const toSearchDisplayResults = (results: SearchResult[]): WebSearchResult[] =>
   results.map((result) => ({
@@ -1010,7 +1022,7 @@ const toSearchDisplayResults = (results: SearchResult[]): WebSearchResult[] =>
     title: result.title || result.url,
     url: result.url,
     snippet: result.snippet,
-    site_icon: null,
+    site_icon: result.logo || letterIcon(result.site || result.title),
     site_name: result.site || null,
     encrypted_content: '',
     page_age: result.published || null,

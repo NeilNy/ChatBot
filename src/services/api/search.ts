@@ -7,6 +7,7 @@ export type SearchResult = {
   url: string
   snippet: string
   site: string
+  logo: string
   published: string
 }
 
@@ -35,6 +36,7 @@ export const searchWeb = async (
     url: item.url,
     snippet: item.snippet,
     site: typeof item.site === 'string' ? item.site : '',
+    logo: typeof item.logo === 'string' ? item.logo : '',
     published: typeof item.published === 'string' ? item.published : '',
   }))
 }

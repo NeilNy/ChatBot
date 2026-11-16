@@ -91,6 +91,7 @@ def search(query: str) -> list[dict[str, str]]:
                 "url": url,
                 "snippet": snippet[:SNIPPET_CHARS],
                 "site": (item.get("SiteName") or "").strip(),
+                "logo": (item.get("LogoUrl") or "").strip(),
                 "published": (item.get("PublishTime") or "").strip(),
             }
         )
