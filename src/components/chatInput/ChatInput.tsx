@@ -9,7 +9,6 @@ import {
 } from '../base/icons.js'
 import { setSearch, setThinking, useSettings } from '../../services/settings.js'
 import {
-  IS_OPENCODE,
   SUPPORTS_ATTACHMENTS,
   SUPPORTS_SEARCH,
   SUPPORTS_SPEECH,
@@ -262,7 +261,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
                 size="m"
                 tone="primary"
                 icon={<IconPaperclipOutline16 />}
-                tooltip={t(IS_OPENCODE ? 'uploadImage' : 'uploadFile')}
+                tooltip={t('uploadFile')}
                 disabled={importingHistory}
                 onClick={() => ensureApiKey() && fileInputRef.current?.click()}
               />

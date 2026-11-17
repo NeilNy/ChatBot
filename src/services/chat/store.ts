@@ -3,6 +3,7 @@ import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { CHAT_MODEL, CLIENT_SEARCH_TOOL, IS_OPENCODE } from '../api/provider.js'
 import { defaultSystemPrompt } from './systemPrompt.js'
+import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
 import type {
@@ -795,23 +796,21 @@ const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
  */
 const ensureServerId = async (apiKey: string, file: FileAttachment): Promise<string | null> => {
   if (IS_OPENCODE) {
-    // 内联图片：缓存命中直接用；刷新后缓存丢失则从 IndexedDB 重新编码
-    const serverId = `inline:${file.id}`
-    if (file.isImage && getInlineFile(serverId)) {
+    // 图片走 base64 缓存，文档走文本提取缓存；刷新后缓存丢失则从 IndexedDB 重建
+    const serverId = `${file.isImage ? 'inline' : 'extract'}:${file.id}`
+    const cached = file.isImage ? getInlineFile(serverId) : getExtractedFile(serverId)
+    if (cached) {
       return serverId
     }
     const task = useUploads.getState().tasks[file.id]
     if (task?.status === 'done' && task.serverId) {
       return task.serverId
     }
-    if (!file.isImage) {
-      return null
-    }
     const blob = await db.loadFile(file.id)
     if (!blob) {
       return null
     }
-    return uploadAttachment(apiKey, file.id, blob, file.name, true)
+    return uploadAttachment(apiKey, file.id, blob, file.name, file.isImage)
   }
   if (file.serverId) {
     return file.serverId
@@ -882,9 +881,9 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   const pending = new Map<string, FileAttachment>()
   for (const [user] of getContextRounds(request.history).toReversed()) {
     for (const file of user.files) {
-      // OpenCode 的图片即使已有 inline: 前缀，也要检查缓存是否还在
+      // OpenCode 的附件即使已有 inline:/extract: 前缀，也要检查缓存是否还在
       if (
-        (IS_OPENCODE ? file.isImage : !file.serverId) &&
+        (IS_OPENCODE || !file.serverId) &&
         !serverIds.has(file.id) &&
         !pending.has(file.id)
       ) {

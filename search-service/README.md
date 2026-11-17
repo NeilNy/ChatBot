@@ -7,6 +7,12 @@
 - 限流：单 IP 12 次/分钟，全局 60 次/分钟
 - 返回：`{"query","count","results":[{"title","url","snippet","site","published"}]}`
 
+另外提供 `POST /extract`，把 OpenCode 不支持的文档转成纯文本：
+
+- 支持 PDF（`pdftotext`）、DOC（`antiword`）、DOCX（XML）、PPT（`catppt`）、PPTX（XML）、XLS（`xls2csv`）、XLSX（`openpyxl`）、文本/代码
+- 单文件上限 6MB，提取文本最多 60000 字
+- 扫描版 PDF（没有文字层）提取不到内容，需要改用图片上传
+
 ## 部署
 
 1. 写入凭证（示例，不要把真实 Key 提交到仓库）：
@@ -54,6 +60,15 @@
        proxy_set_header Host $host;
        proxy_set_header X-Real-IP $remote_addr;
        proxy_read_timeout 30s;
+   }
+
+   location = /extract {
+       proxy_pass http://127.0.0.1:8790;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_read_timeout 60s;
+       proxy_send_timeout 60s;
    }
    ```
 

@@ -1,20 +1,31 @@
 import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { uploadFile } from './api/client.js'
+import { extractFile } from './api/extract.js'
 import { IS_OPENCODE } from './api/provider.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { setExtractedFile } from './extractedFiles.js'
 import { setInlineFile, type InlineFile } from './inlineFiles.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
-/** OpenCode Go 只接受 Anthropic 支持的图片格式，且以 base64 内联发送 */
+/** OpenCode Go 图片以 base64 内联，文档由 /extract 转成纯文本 */
 const INLINE_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+const OPENCODE_FILE_EXTS = [
+  ...INLINE_IMAGE_EXTS,
+  'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx',
+  'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'log',
+  'html', 'htm', 'xml', 'yaml', 'yml', 'ini', 'conf', 'toml',
+  'py', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'less',
+  'go', 'java', 'c', 'h', 'cpp', 'hpp', 'cc', 'cs', 'rs', 'rb',
+  'php', 'sh', 'bash', 'zsh', 'sql', 'swift', 'kt', 'lua', 'r',
+]
 
-/** 允许上传的扩展名，按扩展名白名单过滤；OpenCode 仅图片 */
-export const ACCEPTED_EXTS = IS_OPENCODE ? INLINE_IMAGE_EXTS : ACCEPT_FILE_EXTS
+/** 允许上传的扩展名，按扩展名白名单过滤；OpenCode 支持图片、文档与文本 */
+export const ACCEPTED_EXTS = IS_OPENCODE ? OPENCODE_FILE_EXTS : ACCEPT_FILE_EXTS
 /** 选择文件对话框的过滤条件 */
 export const ACCEPT = ACCEPTED_EXTS.map((ext) => `.${ext}`).join(',')
-/** 单文件大小上限：Files API 为 64MB；内联 base64 受 nginx 8MB 请求体限制，图片按 5MB 控制 */
+/** 单文件大小上限：Files API 为 64MB；OpenCode 的内联/提取受 nginx 8MB 请求体限制，按 5MB 控制 */
 export const MAX_SIZE_MB = IS_OPENCODE ? 5 : 64
 /** 按 user_data 上传的文件（纯文本、代码、表格、电子书）原文件上限更小 */
 export const MAX_USER_DATA_SIZE_MB = 32
@@ -52,7 +63,7 @@ const getMaxSizeMB = (file: File) =>
 /** 添加前校验：格式 → 大小 → 数量，任一不满足即整批不添加 */
 export const validateFiles = (files: File[], currentCount: number): TranslationMessage | null => {
   if (files.some((file) => !isAcceptedExt(file.name))) {
-    return { key: IS_OPENCODE ? 'uploadImagesOnly' : 'uploadUnsupportedFormat' }
+    return { key: IS_OPENCODE ? 'uploadSupportedFiles' : 'uploadUnsupportedFormat' }
   }
   const oversized = files.find((file) => file.size > getMaxSizeMB(file) * 1024 * 1024)
   if (oversized) {
@@ -202,6 +213,21 @@ const enqueueInline = (
   })
 }
 
+/** OpenCode 文档：交给本地 /extract 转成纯文本，返回 extract:<本地 id> 作为 serverId */
+const enqueueExtract = async (
+  id: string,
+  blob: Blob,
+  name: string,
+  signal: AbortSignal
+): Promise<string> => {
+  signal.throwIfAborted()
+  const extracted = await extractFile(blob, name, signal)
+  signal.throwIfAborted()
+  const serverId = `extract:${id}`
+  setExtractedFile(serverId, extracted)
+  return serverId
+}
+
 export const uploadAttachment = (
   apiKey: string,
   id: string,
@@ -216,7 +242,9 @@ export const uploadAttachment = (
   const controller = new AbortController()
   setTask(id, { status: 'uploading' })
   const promise = (IS_OPENCODE
-    ? enqueueInline(id, blob, name, controller.signal)
+    ? isImage
+      ? enqueueInline(id, blob, name, controller.signal)
+      : enqueueExtract(id, blob, name, controller.signal)
     : enqueueUpload(apiKey, blob, name, isImage, controller.signal))
     .then((serverId) => {
       setTask(id, { status: 'done', serverId })

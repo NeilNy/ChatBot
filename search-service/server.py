@@ -13,9 +13,16 @@
 
 from __future__ import annotations
 
+import email
+import html
+import io
 import json
 import os
+import re
+import subprocess
+import tempfile
 import time
+import zipfile
 from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
@@ -32,6 +39,18 @@ MAX_QUERY_CHARS = 200
 PER_IP_PER_MINUTE = 12
 GLOBAL_PER_MINUTE = 60
 SNIPPET_CHARS = 800
+MAX_UPLOAD_BYTES = 6 * 1024 * 1024
+MAX_TEXT_CHARS = 60000
+TEXT_EXTS = {
+    "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "log", "html", "htm",
+    "xml", "yaml", "yml", "ini", "conf", "toml", "py", "js", "jsx", "ts", "tsx",
+    "css", "scss", "less", "go", "java", "c", "h", "cpp", "hpp", "cc", "cs",
+    "rs", "rb", "php", "sh", "bash", "zsh", "sql", "swift", "kt", "lua", "r",
+}
+
+
+class UnsupportedFormat(Exception):
+    pass
 
 _hits: dict[str, deque[float]] = defaultdict(deque)
 _global_hits: deque[float] = deque()
@@ -98,6 +117,119 @@ def search(query: str) -> list[dict[str, str]]:
     return results
 
 
+def _decode_text(data: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", "replace")
+
+
+def _pdf_text(data: bytes) -> str:
+    try:
+        proc = subprocess.run(
+            ["pdftotext", "-layout", "-", "-"],
+            input=data,
+            capture_output=True,
+            timeout=25,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.decode("utf-8", "replace")
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    # 扫描版 PDF 没有文字层时，退回 pypdf 再试一次
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def _run_cmd_temp(cmd: list[str], data: bytes, ext: str) -> str:
+    with tempfile.TemporaryDirectory() as folder:
+        path = os.path.join(folder, f"upload.{ext}")
+        with open(path, "wb") as handle:
+            handle.write(data)
+        proc = subprocess.run([*cmd, path], capture_output=True, timeout=25)
+        if proc.returncode != 0:
+            message = proc.stderr.decode("utf-8", "replace").strip()
+            raise RuntimeError(message[:200] or f"{cmd[0]} failed")
+        return proc.stdout.decode("utf-8", "replace")
+
+
+def _docx_text(data: bytes) -> str:
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        info = archive.getinfo("word/document.xml")
+        if info.file_size > 30 * 1024 * 1024:
+            raise ValueError("document.xml too large")
+        xml = archive.read(info).decode("utf-8", "replace")
+    xml = re.sub(r"</w:p\s*>", "\n", xml)
+    xml = re.sub(r"<w:tab\s*/>", "\t", xml)
+    return html.unescape(re.sub(r"<[^>]+>", "", xml))
+
+
+def _pptx_text(data: bytes) -> str:
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        names = [
+            name
+            for name in archive.namelist()
+            if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+        ]
+        names.sort(key=lambda name: int(re.search(r"(\d+)", name).group(1)))
+        parts: list[str] = []
+        for name in names:
+            info = archive.getinfo(name)
+            if info.file_size > 10 * 1024 * 1024:
+                continue
+            xml = archive.read(info).decode("utf-8", "replace")
+            parts.extend(html.unescape(text) for text in re.findall(r"<a:t>(.*?)</a:t>", xml, re.S))
+    return "\n".join(parts)
+
+
+def _xlsx_text(data: bytes) -> str:
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    lines: list[str] = []
+    for sheet in workbook.worksheets:
+        for row in sheet.iter_rows(values_only=True):
+            cells = [str(cell) for cell in row if cell is not None]
+            if cells:
+                lines.append("\t".join(cells))
+            if len(lines) >= 3000:
+                break
+        if len(lines) >= 3000:
+            break
+    workbook.close()
+    return "\n".join(lines)
+
+
+def extract_text(filename: str, data: bytes) -> tuple[str, bool]:
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext == "pdf":
+        text = _pdf_text(data)
+    elif ext == "doc":
+        text = _run_cmd_temp(["antiword", "-w", "0"], data, ext)
+    elif ext == "docx":
+        text = _docx_text(data)
+    elif ext == "ppt":
+        text = _run_cmd_temp(["catppt"], data, ext)
+    elif ext == "pptx":
+        text = _pptx_text(data)
+    elif ext == "xls":
+        text = _run_cmd_temp(["xls2csv"], data, ext)
+    elif ext == "xlsx":
+        text = _xlsx_text(data)
+    elif ext in TEXT_EXTS:
+        text = _decode_text(data)
+    else:
+        raise UnsupportedFormat(ext or "unknown")
+
+    text = text.replace("\x00", "").strip()
+    truncated = len(text) > MAX_TEXT_CHARS
+    return text[:MAX_TEXT_CHARS], truncated
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "CornhubSearch/1.0"
 
@@ -110,6 +242,75 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(data)
+
+    def _read_upload(self) -> tuple[str, bytes]:
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError as exc:
+            raise ValueError("invalid content length") from exc
+        if length <= 0:
+            raise ValueError("missing body")
+        if length > MAX_UPLOAD_BYTES + 2 * 1024 * 1024:
+            raise ValueError("body too large")
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.startswith("multipart/form-data"):
+            raise ValueError("multipart required")
+        body = self.rfile.read(length)
+        raw = (
+            b"Content-Type: "
+            + content_type.encode("utf-8")
+            + b"\r\nMIME-Version: 1.0\r\n\r\n"
+            + body
+        )
+        message = email.message_from_bytes(raw)
+        for part in message.walk():
+            filename = part.get_filename()
+            if filename:
+                payload = part.get_payload(decode=True) or b""
+                safe_name = os.path.basename(filename.replace("\\", "/"))
+                return safe_name, payload
+        raise ValueError("file field missing")
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        if urlparse(self.path).path != "/extract":
+            self._json(404, {"error": "not_found"})
+            return
+
+        ip = self.headers.get("X-Real-IP") or self.client_address[0]
+        if _rate_limited(ip):
+            self._json(429, {"error": "rate_limited"})
+            return
+
+        try:
+            filename, data = self._read_upload()
+        except ValueError as exc:
+            self._json(400, {"error": "bad_upload", "message": str(exc)[:200]})
+            return
+        if len(data) > MAX_UPLOAD_BYTES:
+            self._json(413, {"error": "file_too_large"})
+            return
+
+        try:
+            text, truncated = extract_text(filename, data)
+        except UnsupportedFormat:
+            self._json(415, {"error": "unsupported_format"})
+            return
+        except subprocess.TimeoutExpired:
+            self._json(504, {"error": "extract_timeout"})
+            return
+        except Exception as exc:  # noqa: BLE001 - 返回给前端统一展示
+            self._json(422, {"error": "extract_failed", "message": str(exc)[:200]})
+            return
+
+        self._json(
+            200,
+            {
+                "filename": filename,
+                "text": text,
+                "chars": len(text),
+                "truncated": truncated,
+            },
+        )
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         parsed = urlparse(self.path)

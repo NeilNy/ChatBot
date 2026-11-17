@@ -32,7 +32,7 @@ import type { ClientTool } from './types.js'
 
 /** OpenCode Go 不支持 Files API，附件改走图片 base64 内联；文档/语音入口隐藏 */
 export const SUPPORTS_ATTACHMENTS = true
-export const SUPPORTS_DOCUMENTS = !IS_OPENCODE
+export const SUPPORTS_DOCUMENTS = true
 export const SUPPORTS_SEARCH = true
 export const SUPPORTS_SPEECH = !IS_OPENCODE
 

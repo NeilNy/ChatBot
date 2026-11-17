@@ -1,4 +1,5 @@
 import { IS_OPENCODE } from '../api/provider.js'
+import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import type {
   AssistantBlockParam,
@@ -21,19 +22,33 @@ import type {
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
  * 发送前 streamReply 会先补齐 serverId；仍为 null 的是本地没有原件的附件，不进入请求。
  */
-const toFileBlocks = (files: FileAttachment[]): FileBlockParam[] => {
-  const blocks: FileBlockParam[] = []
-  for (const { serverId, isImage } of files) {
+const toFileBlocks = (files: FileAttachment[]): (FileBlockParam | TextBlockParam)[] => {
+  const blocks: (FileBlockParam | TextBlockParam)[] = []
+  for (const { serverId, isImage, name } of files) {
     if (!serverId) {
       continue
     }
     if (IS_OPENCODE) {
-      // OpenCode 只支持内联图片；没有缓存时跳过，避免把 Files API 的 id 发过去
-      const inline = isImage ? getInlineFile(serverId) : undefined
-      if (inline) {
+      // OpenCode 没有 Files API：图片内联，文档用 /extract 的纯文本
+      if (isImage) {
+        const inline = getInlineFile(serverId)
+        if (inline) {
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: inline.mediaType, data: inline.data },
+          })
+        }
+        continue
+      }
+      const extracted = getExtractedFile(serverId)
+      if (extracted) {
         blocks.push({
-          type: 'image',
-          source: { type: 'base64', media_type: inline.mediaType, data: inline.data },
+          type: 'text',
+          text: extracted.text.trim()
+            ? `【附件：${name}】\n${extracted.text}${
+                extracted.truncated ? '\n（内容过长，已截断）' : ''
+              }`
+            : `【附件：${name}】未能从文件中提取到文字内容。`,
         })
       }
       continue
