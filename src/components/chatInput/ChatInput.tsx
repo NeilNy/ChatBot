@@ -8,7 +8,12 @@ import {
   IconThinkOutline14,
 } from '../base/icons.js'
 import { setSearch, setThinking, useSettings } from '../../services/settings.js'
-import { SUPPORTS_ATTACHMENTS, SUPPORTS_SEARCH, SUPPORTS_SPEECH } from '../../services/api/provider.js'
+import {
+  IS_OPENCODE,
+  SUPPORTS_ATTACHMENTS,
+  SUPPORTS_SEARCH,
+  SUPPORTS_SPEECH,
+} from '../../services/api/provider.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { sendMessage, stopReply, useChatStore } from '../../services/chat/store.js'
 import {
@@ -257,7 +262,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
                 size="m"
                 tone="primary"
                 icon={<IconPaperclipOutline16 />}
-                tooltip={t('uploadFile')}
+                tooltip={t(IS_OPENCODE ? 'uploadImage' : 'uploadFile')}
                 disabled={importingHistory}
                 onClick={() => ensureApiKey() && fileInputRef.current?.click()}
               />

@@ -1,16 +1,21 @@
 import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { uploadFile } from './api/client.js'
+import { IS_OPENCODE } from './api/provider.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { setInlineFile, type InlineFile } from './inlineFiles.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
-/** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
-export const ACCEPTED_EXTS = ACCEPT_FILE_EXTS
+/** OpenCode Go 只接受 Anthropic 支持的图片格式，且以 base64 内联发送 */
+const INLINE_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+
+/** 允许上传的扩展名，按扩展名白名单过滤；OpenCode 仅图片 */
+export const ACCEPTED_EXTS = IS_OPENCODE ? INLINE_IMAGE_EXTS : ACCEPT_FILE_EXTS
 /** 选择文件对话框的过滤条件 */
 export const ACCEPT = ACCEPTED_EXTS.map((ext) => `.${ext}`).join(',')
-/** 单文件大小上限与 Files API 一致 */
-export const MAX_SIZE_MB = 64
+/** 单文件大小上限：Files API 为 64MB；内联 base64 受 nginx 8MB 请求体限制，图片按 5MB 控制 */
+export const MAX_SIZE_MB = IS_OPENCODE ? 5 : 64
 /** 按 user_data 上传的文件（纯文本、代码、表格、电子书）原文件上限更小 */
 export const MAX_USER_DATA_SIZE_MB = 32
 export const MAX_COUNT = 50
@@ -38,14 +43,16 @@ export const getUploadPurpose = (name: string, isImage: boolean): FilePurpose | 
 
 /** 文件允许的最大体积（MB），按上传时的 purpose 区分 */
 const getMaxSizeMB = (file: File) =>
-  getUploadPurpose(file.name, isImage(resolveMimeType(file))) === 'user_data'
-    ? MAX_USER_DATA_SIZE_MB
-    : MAX_SIZE_MB
+  IS_OPENCODE
+    ? MAX_SIZE_MB
+    : getUploadPurpose(file.name, isImage(resolveMimeType(file))) === 'user_data'
+      ? MAX_USER_DATA_SIZE_MB
+      : MAX_SIZE_MB
 
 /** 添加前校验：格式 → 大小 → 数量，任一不满足即整批不添加 */
 export const validateFiles = (files: File[], currentCount: number): TranslationMessage | null => {
   if (files.some((file) => !isAcceptedExt(file.name))) {
-    return { key: 'uploadUnsupportedFormat' }
+    return { key: IS_OPENCODE ? 'uploadImagesOnly' : 'uploadUnsupportedFormat' }
   }
   const oversized = files.find((file) => file.size > getMaxSizeMB(file) * 1024 * 1024)
   if (oversized) {
@@ -164,6 +171,37 @@ const setTask = (id: string, task: UploadTask | null) =>
 const pending = new Map<string, { promise: Promise<string>; controller: AbortController }>()
 
 /** 开始（或复用进行中的）上传，返回服务端 file_id；失败时任务记为 error 并抛出原错误 */
+/** OpenCode 图片：读取为 base64 并写入内存缓存，返回 inline:<本地 id> 作为 serverId */
+const enqueueInline = (
+  id: string,
+  blob: Blob,
+  name: string,
+  signal: AbortSignal
+): Promise<string> => {
+  const mediaType = blob.type || MIME_BY_EXT[getFileExt(name)] || 'image/png'
+  return new Promise<InlineFile>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const comma = result.indexOf(',')
+      const match =
+        comma > 0 ? /^data:([^;]+);base64$/.exec(result.slice(0, comma)) : null
+      if (!match) {
+        reject(new Error('unsupported image data'))
+        return
+      }
+      resolve({ mediaType: mediaType || match[1], data: result.slice(comma + 1) })
+    }
+    reader.readAsDataURL(blob)
+  }).then((inline) => {
+    signal.throwIfAborted()
+    const serverId = `inline:${id}`
+    setInlineFile(serverId, inline)
+    return serverId
+  })
+}
+
 export const uploadAttachment = (
   apiKey: string,
   id: string,
@@ -177,7 +215,9 @@ export const uploadAttachment = (
   }
   const controller = new AbortController()
   setTask(id, { status: 'uploading' })
-  const promise = enqueueUpload(apiKey, blob, name, isImage, controller.signal)
+  const promise = (IS_OPENCODE
+    ? enqueueInline(id, blob, name, controller.signal)
+    : enqueueUpload(apiKey, blob, name, isImage, controller.signal))
     .then((serverId) => {
       setTask(id, { status: 'done', serverId })
       return serverId

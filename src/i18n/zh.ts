@@ -137,6 +137,7 @@ export const zh = {
   upload: '上传',
   uploadUnsupportedFormat:
     '上传的文件包含暂未支持的文件格式，请转换文件格式后重试。支持 PDF、DOC、XLSX、PPT、图片、文本、代码等。',
+  uploadImagesOnly: '当前服务仅支持图片：PNG、JPG、JPEG、GIF、WEBP。',
   uploadFileStatusFailed: '上传失败',
   uploadRetry: '{message}，点击重试',
   chatInputPlaceholderChat: '请输入消息',
@@ -145,6 +146,7 @@ export const zh = {
   deactivatedSearchTooltip: '按需搜索网页',
   search: '智能搜索',
   uploadFile: '上传文件',
+  uploadImage: '上传图片',
   chatInputStopButtonTooltip: '停止生成',
   uploadMaxMBSize: '单个文件大小超过限制（{size}MB），请调整后重试',
   uploadMaxFiles: '上传文件最多支持 {count} 个',

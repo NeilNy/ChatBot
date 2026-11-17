@@ -145,6 +145,7 @@ export const en = {
   upload: 'Upload',
   uploadUnsupportedFormat:
     'The selected files include unsupported formats. Please convert them and try again. Supported: PDF, DOC, XLSX, PPT, images, text, code, and more.',
+  uploadImagesOnly: 'Only images are supported here: PNG, JPG, JPEG, GIF, and WEBP.',
   uploadFileStatusFailed: 'Upload failed',
   uploadRetry: '{message}. Click to retry',
   chatInputPlaceholderChat: 'Enter a message',
@@ -153,6 +154,7 @@ export const en = {
   deactivatedSearchTooltip: 'Search the web when necessary',
   search: 'Search',
   uploadFile: 'Upload files',
+  uploadImage: 'Upload image',
   chatInputStopButtonTooltip: 'Stop',
   uploadMaxMBSize: 'File exceeds the size limit ({size} MB). Please adjust and try again.',
   uploadMaxFiles: 'You can upload up to {count} files',

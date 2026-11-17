@@ -1,3 +1,5 @@
+import { IS_OPENCODE } from '../api/provider.js'
+import { getInlineFile } from '../inlineFiles.js'
 import type {
   AssistantBlockParam,
   FileBlockParam,
@@ -19,17 +21,30 @@ import type {
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
  * 发送前 streamReply 会先补齐 serverId；仍为 null 的是本地没有原件的附件，不进入请求。
  */
-const toFileBlocks = (files: FileAttachment[]): FileBlockParam[] =>
-  files.flatMap(({ serverId, isImage }) =>
-    serverId
-      ? [
-          {
-            type: isImage ? 'image' : 'document',
-            source: { type: 'file', file_id: serverId },
-          },
-        ]
-      : []
-  )
+const toFileBlocks = (files: FileAttachment[]): FileBlockParam[] => {
+  const blocks: FileBlockParam[] = []
+  for (const { serverId, isImage } of files) {
+    if (!serverId) {
+      continue
+    }
+    if (IS_OPENCODE) {
+      // OpenCode 只支持内联图片；没有缓存时跳过，避免把 Files API 的 id 发过去
+      const inline = isImage ? getInlineFile(serverId) : undefined
+      if (inline) {
+        blocks.push({
+          type: 'image',
+          source: { type: 'base64', media_type: inline.mediaType, data: inline.data },
+        })
+      }
+      continue
+    }
+    blocks.push({
+      type: isImage ? 'image' : 'document',
+      source: { type: 'file', file_id: serverId },
+    })
+  }
+  return blocks
+}
 
 const toReplyBlock = (block: OutputBlockStart, now: number): ReplyBlock | null => {
   switch (block.type) {

@@ -30,8 +30,9 @@ export const CHAT_MODEL = IS_OPENCODE ? OPENCODE_ONLY_MODEL : DEFAULT_MODEL
 
 import type { ClientTool } from './types.js'
 
-/** OpenCode Go 不支持 Files API 与 DeepSeek 服务端工具，附件/语音入口隐藏；搜索改走客户端工具循环 */
-export const SUPPORTS_ATTACHMENTS = !IS_OPENCODE
+/** OpenCode Go 不支持 Files API，附件改走图片 base64 内联；文档/语音入口隐藏 */
+export const SUPPORTS_ATTACHMENTS = true
+export const SUPPORTS_DOCUMENTS = !IS_OPENCODE
 export const SUPPORTS_SEARCH = true
 export const SUPPORTS_SPEECH = !IS_OPENCODE
 

@@ -3,6 +3,7 @@ import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { CHAT_MODEL, CLIENT_SEARCH_TOOL, IS_OPENCODE } from '../api/provider.js'
 import { defaultSystemPrompt } from './systemPrompt.js'
+import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
 import type {
   AssistantBlockParam,
@@ -793,6 +794,25 @@ const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
  * 本地也没有原件（导入的文档附件只有元数据）时返回 null，该附件只展示、不进入请求。
  */
 const ensureServerId = async (apiKey: string, file: FileAttachment): Promise<string | null> => {
+  if (IS_OPENCODE) {
+    // 内联图片：缓存命中直接用；刷新后缓存丢失则从 IndexedDB 重新编码
+    const serverId = `inline:${file.id}`
+    if (file.isImage && getInlineFile(serverId)) {
+      return serverId
+    }
+    const task = useUploads.getState().tasks[file.id]
+    if (task?.status === 'done' && task.serverId) {
+      return task.serverId
+    }
+    if (!file.isImage) {
+      return null
+    }
+    const blob = await db.loadFile(file.id)
+    if (!blob) {
+      return null
+    }
+    return uploadAttachment(apiKey, file.id, blob, file.name, true)
+  }
   if (file.serverId) {
     return file.serverId
   }
@@ -862,7 +882,12 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   const pending = new Map<string, FileAttachment>()
   for (const [user] of getContextRounds(request.history).toReversed()) {
     for (const file of user.files) {
-      if (!file.serverId && !serverIds.has(file.id) && !pending.has(file.id)) {
+      // OpenCode 的图片即使已有 inline: 前缀，也要检查缓存是否还在
+      if (
+        (IS_OPENCODE ? file.isImage : !file.serverId) &&
+        !serverIds.has(file.id) &&
+        !pending.has(file.id)
+      ) {
         pending.set(file.id, file)
       }
     }
