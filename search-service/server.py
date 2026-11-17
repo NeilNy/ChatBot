@@ -39,7 +39,7 @@ MAX_QUERY_CHARS = 200
 PER_IP_PER_MINUTE = 12
 GLOBAL_PER_MINUTE = 60
 SNIPPET_CHARS = 800
-MAX_UPLOAD_BYTES = 6 * 1024 * 1024
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_TEXT_CHARS = 60000
 TEXT_EXTS = {
     "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "log", "html", "htm",
@@ -132,7 +132,7 @@ def _pdf_text(data: bytes) -> str:
             ["pdftotext", "-layout", "-", "-"],
             input=data,
             capture_output=True,
-            timeout=25,
+            timeout=45,
         )
         if proc.returncode == 0 and proc.stdout.strip():
             return proc.stdout.decode("utf-8", "replace")

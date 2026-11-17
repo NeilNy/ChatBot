@@ -25,8 +25,10 @@ const OPENCODE_FILE_EXTS = [
 export const ACCEPTED_EXTS = IS_OPENCODE ? OPENCODE_FILE_EXTS : ACCEPT_FILE_EXTS
 /** 选择文件对话框的过滤条件 */
 export const ACCEPT = ACCEPTED_EXTS.map((ext) => `.${ext}`).join(',')
-/** 单文件大小上限：Files API 为 64MB；OpenCode 的内联/提取受 nginx 8MB 请求体限制，按 5MB 控制 */
-export const MAX_SIZE_MB = IS_OPENCODE ? 5 : 64
+/** 单文件大小上限：Files API 为 64MB；OpenCode 文档 20MB，图片仍限制 5MB */
+export const MAX_SIZE_MB = IS_OPENCODE ? 20 : 64
+/** OpenCode 图片走 base64，上游和 OpenCode v2 都按 5MB 控制 */
+const MAX_INLINE_IMAGE_MB = 5
 /** 按 user_data 上传的文件（纯文本、代码、表格、电子书）原文件上限更小 */
 export const MAX_USER_DATA_SIZE_MB = 32
 export const MAX_COUNT = 50
@@ -55,7 +57,9 @@ export const getUploadPurpose = (name: string, isImage: boolean): FilePurpose | 
 /** 文件允许的最大体积（MB），按上传时的 purpose 区分 */
 const getMaxSizeMB = (file: File) =>
   IS_OPENCODE
-    ? MAX_SIZE_MB
+    ? isImage(resolveMimeType(file))
+      ? MAX_INLINE_IMAGE_MB
+      : MAX_SIZE_MB
     : getUploadPurpose(file.name, isImage(resolveMimeType(file))) === 'user_data'
       ? MAX_USER_DATA_SIZE_MB
       : MAX_SIZE_MB
