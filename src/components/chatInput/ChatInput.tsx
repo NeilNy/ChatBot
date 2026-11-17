@@ -4,10 +4,11 @@ import {
   IconGlobeLanguageOutline14,
   IconPaperclipOutline16,
   IconSendOutline16,
+  IconSpadeOutline14,
   IconStopFill16,
   IconThinkOutline14,
 } from '../base/icons.js'
-import { setSearch, setThinking, useSettings } from '../../services/settings.js'
+import { setSearch, setSts2, setThinking, useSettings } from '../../services/settings.js'
 import {
   SUPPORTS_ATTACHMENTS,
   SUPPORTS_SEARCH,
@@ -58,6 +59,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const sts2 = useSettings((state) => state.sts2)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -238,6 +240,18 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               </button>
             </Tooltip>
           ) : null}
+          <Tooltip content={t('sts2Tooltip')}>
+            <button
+              type="button"
+              className={clsx(styles.toggle, sts2 && styles.selected)}
+              aria-label={t('sts2Toggle')}
+              aria-pressed={sts2}
+              onClick={() => setSts2(!sts2)}
+            >
+              <IconSpadeOutline14 />
+              <span className={styles.toggleLabel}>{t('sts2Toggle')}</span>
+            </button>
+          </Tooltip>
         </div>
         <div className={styles.right}>
           {SUPPORTS_SPEECH ? (

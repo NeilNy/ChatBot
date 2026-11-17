@@ -41,6 +41,12 @@ GLOBAL_PER_MINUTE = 60
 SNIPPET_CHARS = 800
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_TEXT_CHARS = 60000
+STS2_SCRIPT = "/home/ubuntu/.hermes/skills/gaming/sts2-analytics/scripts/sts2_api.py"
+STS2_MAX_OUTPUT = 20000
+STS2_COMMANDS = {
+    "card", "overview", "versions", "cards", "relics", "monsters", "curses",
+    "upgrades", "encounters", "leaderboard", "player-search", "player-profile", "run",
+}
 TEXT_EXTS = {
     "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "log", "html", "htm",
     "xml", "yaml", "yml", "ini", "conf", "toml", "py", "js", "jsx", "ts", "tsx",
@@ -271,8 +277,70 @@ class Handler(BaseHTTPRequestHandler):
                 return safe_name, payload
         raise ValueError("file field missing")
 
+    def _handle_sts2(self) -> None:
+        """运行 sts2_api.py 的白名单命令，把文本结果交给模型工具循环。"""
+        ip = self.headers.get("X-Real-IP") or self.client_address[0]
+        if _rate_limited(ip):
+            self._json(429, {"ok": False, "error": "rate_limited"})
+            return
+        if not os.path.isfile(STS2_SCRIPT):
+            self._json(500, {"ok": False, "error": "sts2_script_missing"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+            if length <= 0 or length > 64 * 1024:
+                raise ValueError("invalid body")
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            command = payload.get("command")
+            args = payload.get("args") or []
+            if not isinstance(command, str) or command not in STS2_COMMANDS:
+                raise ValueError("unsupported command")
+            if not isinstance(args, list) or len(args) > 16:
+                raise ValueError("invalid args")
+            clean: list[str] = []
+            for arg in args:
+                if (
+                    not isinstance(arg, str)
+                    or len(arg) > 200
+                    or any(ord(char) < 32 for char in arg)
+                ):
+                    raise ValueError("invalid args")
+                clean.append(arg)
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._json(400, {"ok": False, "error": "bad_request", "message": str(exc)[:200]})
+            return
+
+        try:
+            proc = subprocess.run(
+                ["/usr/bin/python3", STS2_SCRIPT, command, *clean],
+                capture_output=True,
+                timeout=30,
+                cwd=os.path.dirname(STS2_SCRIPT),
+            )
+        except subprocess.TimeoutExpired:
+            self._json(504, {"ok": False, "error": "sts2_timeout"})
+            return
+        except OSError as exc:
+            self._json(500, {"ok": False, "error": "sts2_failed", "message": str(exc)[:200]})
+            return
+
+        text = (proc.stdout or proc.stderr).decode("utf-8", "replace").strip()
+        self._json(
+            200,
+            {
+                "ok": proc.returncode == 0,
+                "command": command,
+                "text": text[:STS2_MAX_OUTPUT],
+                "truncated": len(text) > STS2_MAX_OUTPUT,
+            },
+        )
+
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-        if urlparse(self.path).path != "/extract":
+        path = urlparse(self.path).path
+        if path == "/sts2":
+            self._handle_sts2()
+            return
+        if path != "/extract":
             self._json(404, {"error": "not_found"})
             return
 

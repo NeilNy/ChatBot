@@ -42,6 +42,75 @@ export const SHOW_API_KEY_SETTINGS = !API_PROVIDER.proxyMode
 /** 同源搜索代理地址，开发环境由 rspack devServer 代理 */
 export const SEARCH_URL = `${API_PROVIDER.origin}/search`
 
+/** 杀戮尖塔 2 数据查询工具：前端调用本地 /sts2，执行 sts2-analytics 白名单命令 */
+export const CLIENT_STS2_TOOL: ClientTool = {
+  name: 'sts2_query',
+  description:
+    '查询杀戮尖塔2（Slay the Spire 2）Skada Analytics 数据。' +
+    'command=cards 查卡牌排名，command=relics 查遗物排名，command=overview 查总览，' +
+    'command=versions 查可用版本，command=player-profile 查玩家档案。' +
+    '角色用 IRONCLAD/SILENT/DEFECT/REGENT/NECROBINDER；' +
+    '排序用 skada_score/win_rate_picked/win_rate_skipped/delta/pick_rate/hold_rate。',
+  input_schema: {
+    type: 'object',
+    properties: {
+      command: {
+        type: 'string',
+        enum: [
+          'overview',
+          'cards',
+          'card',
+          'relics',
+          'monsters',
+          'curses',
+          'upgrades',
+          'encounters',
+          'leaderboard',
+          'player-search',
+          'player-profile',
+          'run',
+          'versions',
+        ],
+        description: '要执行的查询命令',
+      },
+      character: {
+        type: 'string',
+        enum: ['IRONCLAD', 'SILENT', 'DEFECT', 'REGENT', 'NECROBINDER'],
+        description: '角色过滤',
+      },
+      sort: {
+        type: 'string',
+        enum: [
+          'skada_score',
+          'win_rate_picked',
+          'win_rate_skipped',
+          'delta',
+          'pick_rate',
+          'hold_rate',
+        ],
+        description: '排序字段',
+      },
+      page_size: { type: 'integer', description: '每页条数，建议 5-20' },
+      page: { type: 'integer', description: '页码，从 1 开始' },
+      asc_min: { type: 'integer', description: '最低进阶等级' },
+      asc_max: { type: 'integer', description: '最高进阶等级' },
+      version: { type: 'string', description: '游戏版本，如 v0.113；不确定时先查 versions' },
+      name: { type: 'string', description: '卡牌名或玩家名，用于 card / player-search / player-profile' },
+      type: {
+        type: 'string',
+        enum: ['normal', 'elite', 'boss', 'event', 'shop', 'rest'],
+        description: 'encounters 的节点类型',
+      },
+      mode: {
+        type: 'string',
+        enum: ['STANDARD', 'CUSTOM'],
+        description: '游戏模式',
+      },
+    },
+    required: ['command'],
+  },
+}
+
 /** OpenCode Go 的联网搜索工具，由前端执行后把结果回传给模型 */
 export const CLIENT_SEARCH_TOOL: ClientTool = {
   name: 'search_web',

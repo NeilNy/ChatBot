@@ -523,3 +523,14 @@ export const IconToastError16 = () => (
     />
   </svg>
 )
+
+export const IconSpadeOutline14 = () => (
+  <svg width={14} height={14} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M7 1.6c2.1 2.5 4.3 4.2 4.3 6.3a2.5 2.5 0 0 1-4.3 1.6c.1.9.5 1.7 1.1 2.3H5.9c.6-.6 1-1.4 1.1-2.3A2.5 2.5 0 0 1 2.7 7.9C2.7 5.8 4.9 4.1 7 1.6Z"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+  </svg>
+)

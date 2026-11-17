@@ -1,14 +1,16 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { CHAT_MODEL, CLIENT_SEARCH_TOOL, IS_OPENCODE } from '../api/provider.js'
+import { CHAT_MODEL, CLIENT_SEARCH_TOOL, CLIENT_STS2_TOOL, IS_OPENCODE } from '../api/provider.js'
 import { defaultSystemPrompt } from './systemPrompt.js'
 import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
+import { querySts2 } from '../api/sts2.js'
 import type {
   AssistantBlockParam,
   ChatModel,
+  ClientToolResultBlockParam,
   CreateMessageRequest,
   MessageParam,
   WebSearchResult,
@@ -59,11 +61,17 @@ const FILE_RETRY_LIMIT = 2
 /** 退避基数，第 n 次重试等待 2^n 倍；连续失败达到上限就放弃，把原始报错展示出来 */
 const FILE_RETRY_BASE_DELAY = 1000
 
-/** 阅读链接始终开启，智能搜索开关控制是否另行声明搜索工具（含边想边搜）。 */
-const serverTools = (search: boolean): CreateMessageRequest['tools'] => {
-  // OpenCode Go 只支持标准客户端工具，搜索由前端执行 /search 后回传 tool_result
+/** 搜索/杀戮尖塔开关控制声明哪些工具；OpenCode 由前端执行后回传 tool_result。 */
+const serverTools = (search: boolean, sts2: boolean): CreateMessageRequest['tools'] => {
   if (IS_OPENCODE) {
-    return search ? [CLIENT_SEARCH_TOOL] : []
+    const tools: CreateMessageRequest['tools'] = []
+    if (search) {
+      tools.push(CLIENT_SEARCH_TOOL)
+    }
+    if (sts2) {
+      tools.push(CLIENT_STS2_TOOL)
+    }
+    return tools
   }
   const tools: CreateMessageRequest['tools'] = [
     { type: 'deepseek_read_url', name: 'deepseek_read_url' },
@@ -271,9 +279,9 @@ export const bindChatPersistence = () => {
   }
 }
 
-/** 按当前开关创建回复：深度思考对应 thinking，智能搜索控制 deepseek_web_search。 */
+/** 按当前开关创建回复：深度思考对应 thinking，搜索/杀戮尖塔控制工具声明。 */
 const createReply = (): AssistantMessage => {
-  const { thinking, search } = useSettings.getState()
+  const { thinking, search, sts2 } = useSettings.getState()
   return {
     id: createId(),
     role: 'assistant',
@@ -281,6 +289,7 @@ const createReply = (): AssistantMessage => {
     model: MODEL,
     thinking,
     search,
+    sts2,
     prefix: true,
     status: 'pending',
     blocks: [],
@@ -723,13 +732,14 @@ export const continueReply = (sessionId: string, messageId: string) => {
   ) {
     return
   }
-  const { thinking, search } = useSettings.getState()
+  const { thinking, search, sts2 } = useSettings.getState()
   const reply: AssistantMessage = {
     ...previous,
     // 未记录请求配置的回复，续写时使用默认模型和当前开关。
     model: previous.model ?? MODEL,
     thinking: previous.thinking ?? thinking,
     search: previous.search ?? search,
+    sts2: previous.sts2 ?? sts2,
     status: 'pending',
     stopReason: undefined,
     stopDetails: undefined,
@@ -1019,8 +1029,8 @@ const applyLocalTitle = (sessionId: string) => {
   )
 }
 
-/** 单条回复最多执行几次客户端联网搜索，避免模型无限调用 */
-const MAX_SEARCH_ROUNDS = 3
+/** 单条回复最多执行几轮客户端工具，避免模型无限调用 */
+const MAX_TOOL_ROUNDS = 3
 /** 回传给模型的搜索结果上限，防止上下文膨胀 */
 const MAX_TOOL_RESULT_CHARS = 12000
 
@@ -1113,21 +1123,21 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         )
         const apiKey = useSettings.getState().apiKey ?? ''
         const blockIndexes = new Map<number, number>()
-        // 客户端工具循环：OpenCode Go 的 search_web 可能连续调用多次
+        // 客户端工具循环：search_web / sts2_query 可能连续调用多次
         for (let round = 0; ; round += 1) {
           const allowClientTool =
-            IS_OPENCODE && (initial.search ?? false) && round < MAX_SEARCH_ROUNDS
+            IS_OPENCODE &&
+            ((initial.search ?? false) || (initial.sts2 ?? false)) &&
+            round < MAX_TOOL_ROUNDS
           const tools = IS_OPENCODE
             ? allowClientTool
-              ? serverTools(true)
+              ? serverTools(initial.search ?? false, initial.sts2 ?? false)
               : []
-            : serverTools(initial.search ?? false)
-          let pendingTool: {
-            id: string
-            name: string
-            json: string
-            input: unknown
-          } | null = null
+            : serverTools(initial.search ?? false, false)
+          const pendingTools = new Map<
+            number,
+            { id: string; name: string; json: string; input: unknown }
+          >()
           let roundText = ''
           const events = streamMessage(
             apiKey,
@@ -1148,18 +1158,20 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               event.type === 'content_block_start' &&
               event.content_block.type === 'tool_use'
             ) {
-              pendingTool = {
+              pendingTools.set(event.index, {
                 id: event.content_block.id,
                 name: event.content_block.name,
                 json: '',
                 input: event.content_block.input,
-              }
+              })
             } else if (
               event.type === 'content_block_delta' &&
-              event.delta.type === 'input_json_delta' &&
-              pendingTool
+              event.delta.type === 'input_json_delta'
             ) {
-              pendingTool.json += event.delta.partial_json
+              const pending = pendingTools.get(event.index)
+              if (pending) {
+                pending.json += event.delta.partial_json
+              }
             } else if (
               event.type === 'content_block_delta' &&
               event.delta.type === 'text_delta'
@@ -1189,96 +1201,165 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             }
           }
 
-          if (!pendingTool || !allowClientTool) {
+          const toolCalls = [...pendingTools.values()]
+          if (toolCalls.length === 0 || !allowClientTool) {
             break
           }
-
-          let input: Record<string, unknown> = {}
-          try {
-            input = JSON.parse(pendingTool.json || '{}') as Record<string, unknown>
-          } catch {
-            input =
-              pendingTool.input && typeof pendingTool.input === 'object'
-                ? (pendingTool.input as Record<string, unknown>)
-                : {}
-          }
-          const query =
-            typeof input.query === 'string' ? input.query.trim().slice(0, 200) : ''
-          if (!query) {
-            break
-          }
-
-          // 先插入搜索调用块，SearchPanel 在结果到达前显示「搜索中」
-          const toolUseId = `local_${pendingTool.id}`
-          reply = {
-            ...reply,
-            blocks: [
-              ...reply.blocks,
-              {
-                type: 'server_tool_use',
-                id: toolUseId,
-                name: 'deepseek_web_search',
-                input: { action: 'search', queries: [query] },
-                caller: { type: 'direct' },
-                kind: 'search',
-              },
-            ],
-          }
-          updateReply(sessionId, reply)
-          persist(sessionId)
-
-          let results: SearchResult[] = []
-          try {
-            results = await searchWeb(query, controller.signal)
-          } catch {
-            results = []
-          }
-
-          reply = {
-            ...reply,
-            blocks: [
-              ...reply.blocks,
-              {
-                type: 'web_search_tool_result',
-                tool_use_id: toolUseId,
-                content:
-                  results.length > 0
-                    ? toSearchDisplayResults(results)
-                    : [
-                        {
-                          type: 'web_search_tool_result_error',
-                          error_code: 'unavailable',
-                        },
-                      ],
-                kind: 'search',
-              },
-            ],
-          }
-          updateReply(sessionId, reply)
-          persist(sessionId)
 
           const assistantContent: AssistantBlockParam[] = []
           if (roundText.trim()) {
             assistantContent.push({ type: 'text', text: roundText })
           }
-          assistantContent.push({
-            type: 'tool_use',
-            id: pendingTool.id,
-            name: pendingTool.name,
-            input,
-          })
-          messages.push({ role: 'assistant', content: assistantContent })
-          messages.push({
-            role: 'user',
-            content: [
-              {
+          const toolResults: ClientToolResultBlockParam[] = []
+
+          for (const call of toolCalls) {
+            let input: Record<string, unknown> = {}
+            try {
+              input = JSON.parse(call.json || '{}') as Record<string, unknown>
+            } catch {
+              input =
+                call.input && typeof call.input === 'object'
+                  ? (call.input as Record<string, unknown>)
+                  : {}
+            }
+            assistantContent.push({
+              type: 'tool_use',
+              id: call.id,
+              name: call.name,
+              input,
+            })
+
+            if (call.name === 'search_web') {
+              const query =
+                typeof input.query === 'string' ? input.query.trim().slice(0, 200) : ''
+              if (!query) {
+                toolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: call.id,
+                  content: '缺少 query 参数。',
+                  is_error: true,
+                })
+                continue
+              }
+
+              // 先插入搜索调用块，SearchPanel 在结果到达前显示「搜索中」
+              const toolUseId = `local_${call.id}`
+              reply = {
+                ...reply,
+                blocks: [
+                  ...reply.blocks,
+                  {
+                    type: 'server_tool_use',
+                    id: toolUseId,
+                    name: 'deepseek_web_search',
+                    input: { action: 'search', queries: [query] },
+                    caller: { type: 'direct' },
+                    kind: 'search',
+                  },
+                ],
+              }
+              updateReply(sessionId, reply)
+              persist(sessionId)
+
+              let results: SearchResult[] = []
+              try {
+                results = await searchWeb(query, controller.signal)
+              } catch {
+                results = []
+              }
+
+              reply = {
+                ...reply,
+                blocks: [
+                  ...reply.blocks,
+                  {
+                    type: 'web_search_tool_result',
+                    tool_use_id: toolUseId,
+                    content:
+                      results.length > 0
+                        ? toSearchDisplayResults(results)
+                        : [
+                            {
+                              type: 'web_search_tool_result_error',
+                              error_code: 'unavailable',
+                            },
+                          ],
+                    kind: 'search',
+                  },
+                ],
+              }
+              updateReply(sessionId, reply)
+              persist(sessionId)
+
+              toolResults.push({
                 type: 'tool_result',
-                tool_use_id: pendingTool.id,
+                tool_use_id: call.id,
                 content: toToolResultText(results),
                 is_error: results.length === 0,
-              },
-            ],
-          })
+              })
+              continue
+            }
+
+            if (call.name === 'sts2_query') {
+              const command =
+                typeof input.command === 'string' ? input.command.trim() : ''
+              // 把扁平参数翻译成 sts2_api.py 的 CLI 参数，避免模型自己拼 flag
+              const args: string[] = []
+              const addText = (flag: string, value: unknown) => {
+                if (typeof value === 'string' && value.trim()) {
+                  args.push(flag, value.trim())
+                }
+              }
+              addText('--character', input.character)
+              addText('--sort', input.sort)
+              addText('--version', input.version)
+              addText('--name', input.name)
+              addText('--type', input.type)
+              addText('--mode', input.mode)
+              for (const [key, flag] of [
+                ['page_size', '--page-size'],
+                ['page', '--page'],
+                ['asc_min', '--asc-min'],
+                ['asc_max', '--asc-max'],
+              ] as const) {
+                const value = input[key]
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                  args.push(flag, String(Math.trunc(value)))
+                }
+              }
+              if (input.asc === true) {
+                args.push('--asc')
+              }
+              let text = ''
+              let ok = false
+              try {
+                const result = await querySts2(command, args, controller.signal)
+                text = result.text
+                ok = result.ok
+              } catch (error) {
+                text = `杀戮尖塔数据查询失败：${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              }
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: call.id,
+                content: text || '没有返回数据。',
+                is_error: !ok,
+              })
+              continue
+            }
+
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: call.id,
+              content: `未知工具：${call.name}`,
+              is_error: true,
+            })
+          }
+
+          messages.push({ role: 'assistant', content: assistantContent })
+          messages.push({ role: 'user', content: toolResults })
         }
         reply = settleReply(reply, 'done', Date.now())
         break

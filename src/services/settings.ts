@@ -17,6 +17,7 @@ type Settings = {
   ttsVoice: TtsVoice
   thinking: boolean
   search: boolean
+  sts2: boolean
   systemPrompt: string | null
   siderCollapsed: boolean
 }
@@ -29,6 +30,7 @@ const KEYS = {
   ttsVoice: 'chat-demo:tts-voice',
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
+  sts2: 'chat-demo:sts2',
   systemPrompt: 'chat-demo:system-prompt',
   siderCollapsed: 'chat-demo:sider-collapsed',
 } as const
@@ -113,6 +115,7 @@ export const useSettings = create<Settings>(() => ({
   ttsVoice: initialTtsVoice(),
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
+  sts2: read(KEYS.sts2) === 'true',
   systemPrompt: initialSystemPrompt(),
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
 }))
@@ -151,6 +154,11 @@ export const setThinking = (thinking: boolean) => {
 export const setSearch = (search: boolean) => {
   write(KEYS.search, String(search))
   useSettings.setState({ search })
+}
+
+export const setSts2 = (sts2: boolean) => {
+  write(KEYS.sts2, String(sts2))
+  useSettings.setState({ sts2 })
 }
 
 /** 空字符串表示恢复内置默认提示词 */

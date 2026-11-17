@@ -14,6 +14,13 @@
 - 图片仍限制 5MB（base64 内联）
 - 扫描版 PDF（没有文字层）提取不到内容，需要改用图片上传
 
+另外提供 `POST /sts2`，执行 `sts2-analytics` skill 的白名单命令：
+
+- 脚本：`/home/ubuntu/.hermes/skills/gaming/sts2-analytics/scripts/sts2_api.py`
+- 命令：`overview/cards/card/relics/monsters/curses/upgrades/encounters/leaderboard/player-search/player-profile/run/versions`
+- 请求：`{"command":"cards","args":["--character","IRONCLAD","--page-size","10"]}`
+- 超时 30 秒，返回文本最多 20000 字
+
 ## 部署
 
 1. 写入凭证（示例，不要把真实 Key 提交到仓库）：
@@ -67,6 +74,15 @@
    client_max_body_size 40m;
 
    location = /extract {
+       proxy_pass http://127.0.0.1:8790;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_read_timeout 60s;
+       proxy_send_timeout 60s;
+   }
+
+   location = /sts2 {
        proxy_pass http://127.0.0.1:8790;
        proxy_http_version 1.1;
        proxy_set_header Host $host;
