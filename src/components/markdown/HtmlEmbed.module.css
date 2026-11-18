@@ -9,10 +9,47 @@
 }
 
 .generating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0 14px;
-  padding: 12px 14px;
-  border: 1px dashed var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: linear-gradient(
+      100deg,
+      var(--dsw-alias-markdown-code-block) 30%,
+      var(--dsw-alias-interactive-bg-hover) 50%,
+      var(--dsw-alias-markdown-code-block) 70%
+    )
+    0 0 / 220% 100%;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
+  animation: embedShimmer 1.8s linear infinite;
+}
+
+.generatingDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dsw-alias-brand-primary);
+  animation: embedPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes embedShimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@keyframes embedPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }

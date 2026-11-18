@@ -76,7 +76,12 @@ export const HtmlEmbed = ({ html, loading }: { html: string; loading: boolean })
   }, [html, theme])
 
   if (loading) {
-    return <div className={styles.generating}>{t('htmlEmbedGenerating')}</div>
+    return (
+      <div className={styles.generating} role="status" aria-live="polite">
+        <span className={styles.generatingDot} />
+        {t('htmlEmbedGenerating')}
+      </div>
+    )
   }
 
   return (

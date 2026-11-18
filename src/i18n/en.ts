@@ -51,7 +51,7 @@ export const en = {
   mermaidSwitchLabel: 'Toggle between Mermaid diagram and code',
   toolSearchIntro: 'Searching for',
   toolCalling: 'Calling tool',
-  htmlEmbedGenerating: 'Generating embed…',
+  htmlEmbedGenerating: 'Generating game card…',
   htmlEmbedTitle: 'Game data embed',
   toolRunning: 'Running…',
   toolDone: 'Done',
