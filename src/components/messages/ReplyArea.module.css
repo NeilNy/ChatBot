@@ -376,8 +376,3 @@
   font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap;
 }
-
-.profileStep {
-  position: relative;
-  padding: 4px 0 4px 0;
-}

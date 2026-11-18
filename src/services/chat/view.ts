@@ -74,9 +74,6 @@ export type ToolStep = {
   status: ToolStatus
 }
 
-/** 杀戮尖塔玩家档案内嵌块 */
-export type ProfileStep = { type: 'profile'; key: string; profile: Sts2Profile }
-
 /** 工具调用前输出的说明文字 */
 export type PreambleStep = { type: 'text'; key: string; markdown: string }
 
@@ -87,7 +84,6 @@ export type Step =
   | ReadLinkStep
   | ThinkingStep
   | ToolStep
-  | ProfileStep
   | PreambleStep
 
 export type ReplyView = {
@@ -98,6 +94,8 @@ export type ReplyView = {
   sources: Source[]
   /** 搜索到的网页（去重），用于底部汇总与搜索结果列表 */
   searchResults: Source[]
+  /** 玩家档案内嵌块，放在正文之后展示 */
+  profiles: { key: string; profile: Sts2Profile }[]
 }
 
 export const getSiteName = (url: string) => {
@@ -205,6 +203,7 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
 
   const registry = new SourceRegistry()
   const searchResults: Source[] = []
+  const profiles: { key: string; profile: Sts2Profile }[] = []
   const steps: Step[] = []
   const mergedSearch = new Map<ServerToolKind, SearchStep>()
   let mergedThinking: ThinkingStep | null = null
@@ -269,12 +268,7 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
       return
     }
     if (block.type === 'sts2_profile') {
-      flushPreamble()
-      steps.push({
-        type: 'profile',
-        key: `profile-${block.id}`,
-        profile: block.profile,
-      })
+      profiles.push({ key: `profile-${block.id}`, profile: block.profile })
       return
     }
     if (block.type === 'client_tool') {
@@ -394,6 +388,7 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
     answer: answer && answer.text ? answer : null,
     sources: registry.list,
     searchResults,
+    profiles,
   }
 }
 

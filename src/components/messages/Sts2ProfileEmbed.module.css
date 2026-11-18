@@ -1,33 +1,100 @@
 .embed {
+  /* 浅色：羊皮纸 + 暗金；深色在下方 body.dark 覆盖 */
+  --sts-gold: #9a7418;
+  --sts-gold-bright: #7d5a0c;
+  --sts-gold-soft: rgb(154 116 24 / 12%);
+  --sts-bg: #fcf7ec;
+  --sts-bg-start: #fffaf0;
+  --sts-bg-end: #f1e6d2;
+  --sts-panel: #f6edda;
+  --sts-panel-2: #ece0c8;
+  --sts-text: #2c2218;
+  --sts-muted: #7d6b54;
+  --sts-red: #a33131;
+  --sts-green: #2f6b45;
+  --sts-purple: #6b4b8a;
+  --sts-purple-bright: #5a3b78;
+  --sts-border: rgb(140 106 30 / 50%);
+  --sts-border-soft: rgb(140 106 30 / 22%);
+  --sts-shadow: 0 14px 34px rgb(90 65 20 / 16%);
+  --sts-header: linear-gradient(180deg, rgb(166 124 22 / 10%), transparent);
+  --sts-tabbar: rgb(90 65 20 / 6%);
+  --sts-hover: rgb(90 65 20 / 6%);
+  --sts-track: rgb(43 33 24 / 10%);
+  --sts-statbg: linear-gradient(160deg, rgb(255 255 255 / 70%), transparent);
+  --sts-character-bg: linear-gradient(160deg, rgb(255 255 255 / 60%), transparent);
+  --sts-record-bg: rgb(90 65 20 / 5%);
+  --sts-runline: rgb(43 33 24 / 8%);
+  --sts-expanded: rgb(90 65 20 / 6%);
+  --sts-glow-purple: rgb(107 75 138 / 8%);
+  --sts-glow-red: rgb(161 49 49 / 7%);
+  --sts-purple-soft: rgb(107 75 138 / 10%);
+  --sts-purple-border: rgb(107 75 138 / 35%);
+  --sts-purple-text: #5a3b78;
+  --sts-bar-from: #8a6a1c;
+  --sts-bar-to: #b08b2a;
+  --sts-growth-to: #7a5c16;
+  width: 100%;
+  margin: 8px 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--sts-border);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 0%, var(--sts-glow-purple), transparent 42%),
+    radial-gradient(circle at 100% 100%, var(--sts-glow-red), transparent 45%),
+    linear-gradient(155deg, var(--sts-bg-start) 0%, var(--sts-bg) 55%, var(--sts-bg-end) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 22%),
+    var(--sts-shadow);
+  color: var(--sts-text);
+  font-family: Georgia, 'Times New Roman', 'Songti SC', 'Noto Serif CJK SC', serif;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+
+:global(body.dark) .embed {
   --sts-gold: #c9a227;
   --sts-gold-bright: #f2d98a;
+  --sts-gold-soft: rgb(201 162 39 / 14%);
   --sts-bg: #120e15;
+  --sts-bg-start: #17111d;
+  --sts-bg-end: #0d0a11;
   --sts-panel: #1b1520;
   --sts-panel-2: #241a2c;
   --sts-text: #ece2d0;
   --sts-muted: #a2937f;
   --sts-red: #c04a4a;
   --sts-green: #6fae78;
-  width: 100%;
-  margin: 8px 0 14px;
-  overflow: hidden;
-  border: 1px solid rgb(201 162 39 / 55%);
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 12% 0%, rgb(122 79 163 / 22%), transparent 42%),
-    radial-gradient(circle at 100% 100%, rgb(160 40 40 / 16%), transparent 45%),
-    linear-gradient(155deg, #17111d 0%, var(--sts-bg) 55%, #0d0a11 100%);
-  box-shadow:
-    inset 0 0 0 1px rgb(0 0 0 / 55%),
-    0 14px 34px rgb(0 0 0 / 32%);
-  color: var(--sts-text);
-  font-family: Georgia, 'Times New Roman', 'Songti SC', 'Noto Serif CJK SC', serif;
+  --sts-purple: #7a4fa3;
+  --sts-purple-bright: #d8b8f2;
+  --sts-border: rgb(201 162 39 / 55%);
+  --sts-border-soft: rgb(201 162 39 / 14%);
+  --sts-shadow: 0 14px 34px rgb(0 0 0 / 32%);
+  --sts-header: linear-gradient(180deg, rgb(201 162 39 / 7%), transparent);
+  --sts-tabbar: rgb(0 0 0 / 22%);
+  --sts-hover: rgb(255 255 255 / 3%);
+  --sts-track: rgb(255 255 255 / 6%);
+  --sts-statbg: linear-gradient(160deg, rgb(255 255 255 / 3%), transparent);
+  --sts-character-bg: linear-gradient(160deg, rgb(255 255 255 / 4%), transparent);
+  --sts-record-bg: rgb(0 0 0 / 18%);
+  --sts-runline: rgb(255 255 255 / 5%);
+  --sts-expanded: rgb(0 0 0 / 22%);
+  --sts-glow-purple: rgb(122 79 163 / 22%);
+  --sts-glow-red: rgb(160 40 40 / 16%);
+  --sts-purple-soft: rgb(122 79 163 / 12%);
+  --sts-purple-border: rgb(122 79 163 / 45%);
+  --sts-purple-text: #d8b8f2;
+  --sts-bar-from: #8a6a1c;
+  --sts-bar-to: #f2d98a;
+  --sts-growth-to: #7a5c16;
 }
 
 .header {
   padding: 16px 18px 14px;
-  border-bottom: 1px solid rgb(201 162 39 / 22%);
-  background: linear-gradient(180deg, rgb(201 162 39 / 7%), transparent);
+  border-bottom: 1px solid var(--sts-border-soft);
+  background: var(--sts-header);
 }
 
 .brand {
@@ -47,7 +114,7 @@
   font-size: 25px;
   font-weight: 600;
   line-height: 1.2;
-  text-shadow: 0 0 18px rgb(201 162 39 / 25%);
+  text-shadow: 0 0 18px var(--sts-gold-soft);
 }
 
 .hero {
@@ -63,7 +130,7 @@
   font-size: 36px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 22px rgb(242 217 138 / 20%);
+  text-shadow: 0 0 22px var(--sts-gold-soft);
 }
 
 .heroLabel {
@@ -94,8 +161,8 @@
   display: flex;
   overflow-x: auto;
   padding: 0 10px;
-  border-bottom: 1px solid rgb(201 162 39 / 18%);
-  background: rgb(0 0 0 / 22%);
+  border-bottom: 1px solid var(--sts-border-soft);
+  background: var(--sts-tabbar);
   scrollbar-width: none;
 
   &::-webkit-scrollbar {
@@ -143,9 +210,9 @@
   flex-direction: column;
   gap: 3px;
   padding: 9px 10px;
-  border: 1px solid rgb(201 162 39 / 14%);
+  border: 1px solid var(--sts-border-soft);
   border-radius: 9px;
-  background: linear-gradient(160deg, rgb(255 255 255 / 3%), transparent);
+  background: var(--sts-statbg);
 }
 
 .statValue {
@@ -172,15 +239,15 @@
   align-items: center;
   gap: 6px;
   padding: 4px 9px;
-  border: 1px solid rgb(122 79 163 / 45%);
+  border: 1px solid var(--sts-purple-border);
   border-radius: 999px;
-  background: rgb(122 79 163 / 12%);
+  background: var(--sts-purple-soft);
   color: var(--sts-muted);
   font-size: 11px;
 }
 
 .percentile strong {
-  color: #d8b8f2;
+  color: var(--sts-purple-text);
   font-weight: 600;
 }
 
@@ -203,8 +270,8 @@
   flex-direction: column;
   gap: 3px;
   padding: 9px 10px;
-  border-left: 2px solid rgb(201 162 39 / 45%);
-  background: rgb(0 0 0 / 18%);
+  border-left: 2px solid var(--sts-border);
+  background: var(--sts-record-bg);
   color: var(--sts-muted);
   font-size: 11px;
 }
@@ -224,11 +291,11 @@
 
 .characterCard {
   padding: 11px 12px;
-  border: 1px solid rgb(201 162 39 / 16%);
+  border: 1px solid var(--sts-border-soft);
   border-radius: 10px;
   background:
-    radial-gradient(circle at 100% 0%, rgb(122 79 163 / 16%), transparent 50%),
-    linear-gradient(160deg, rgb(255 255 255 / 4%), transparent);
+    radial-gradient(circle at 100% 0%, var(--sts-glow-purple), transparent 50%),
+    var(--sts-character-bg);
 }
 
 .characterTop {
@@ -253,14 +320,14 @@
   margin: 9px 0 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(255 255 255 / 6%);
+  background: var(--sts-track);
 }
 
 .barFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #8a6a1c, var(--sts-gold-bright));
-  box-shadow: 0 0 10px rgb(242 217 138 / 35%);
+  background: linear-gradient(90deg, var(--sts-bar-from), var(--sts-bar-to));
+  box-shadow: 0 0 10px var(--sts-gold-soft);
 }
 
 .characterMeta {
@@ -280,7 +347,7 @@
 
 .filter {
   padding: 4px 10px;
-  border: 1px solid rgb(201 162 39 / 22%);
+  border: 1px solid var(--sts-border-soft);
   border-radius: 999px;
   background: transparent;
   color: var(--sts-muted);
@@ -289,14 +356,14 @@
   cursor: pointer;
 
   &:hover {
-    border-color: rgb(201 162 39 / 50%);
+    border-color: var(--sts-border);
     color: var(--sts-text);
   }
 }
 
 .filterActive {
   border-color: var(--sts-gold);
-  background: rgb(201 162 39 / 14%);
+  background: var(--sts-gold-soft);
   color: var(--sts-gold-bright);
 }
 
@@ -313,7 +380,7 @@
   width: 100%;
   padding: 8px 4px;
   border: 0;
-  border-bottom: 1px solid rgb(255 255 255 / 5%);
+  border-bottom: 1px solid var(--sts-runline);
   background: none;
   color: var(--sts-muted);
   font: inherit;
@@ -322,12 +389,12 @@
   cursor: pointer;
 
   &:hover {
-    background: rgb(255 255 255 / 3%);
+    background: var(--sts-hover);
   }
 }
 
 .runExpanded {
-  background: rgb(0 0 0 / 22%);
+  background: var(--sts-expanded);
 }
 
 .runStatus {
@@ -413,8 +480,8 @@
   width: 100%;
   min-height: 4px;
   border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, var(--sts-gold-bright), #7a5c16);
-  box-shadow: 0 0 12px rgb(201 162 39 / 22%);
+  background: linear-gradient(180deg, var(--sts-bar-to), var(--sts-growth-to));
+  box-shadow: 0 0 12px var(--sts-gold-soft);
 }
 
 .growthMonth {
@@ -433,7 +500,7 @@
 .empty {
   margin: 8px 0 14px;
   padding: 14px 16px;
-  border: 1px dashed rgb(201 162 39 / 35%);
+  border: 1px dashed var(--sts-border-soft);
   border-radius: 12px;
   color: var(--sts-muted);
   font-size: 12px;

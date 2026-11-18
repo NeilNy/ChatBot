@@ -34,7 +34,6 @@ import { Tooltip } from '../base/Tooltip.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
-import { Sts2ProfileEmbed } from './Sts2ProfileEmbed.js'
 import styles from './ReplyArea.module.css'
 import './thinking.markdown.css'
 
@@ -111,8 +110,7 @@ const stepKey = (step: Step, index: number) =>
   step.type === 'thinking' ||
   step.type === 'text' ||
   step.type === 'search' ||
-  step.type === 'tool' ||
-  step.type === 'profile'
+  step.type === 'tool'
     ? step.key
     : `${step.type}-${index}`
 
@@ -161,12 +159,6 @@ const StepItem = ({
       return <SearchRow step={step} message={message} streaming={streaming} isLast={isLast} />
     case 'tool':
       return <ClientToolRow step={step} isLast={isLast} />
-    case 'profile':
-      return (
-        <div className={clsx(!isLast && styles.withLine, styles.profileStep)}>
-          <Sts2ProfileEmbed profile={step.profile} />
-        </div>
-      )
     case 'open':
       return <OpenRow step={step} sources={sources} isLast={isLast} />
     case 'find':

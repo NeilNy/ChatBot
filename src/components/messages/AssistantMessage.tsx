@@ -12,6 +12,7 @@ import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
+import { Sts2ProfileEmbed } from './Sts2ProfileEmbed.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
 import { ReadAloudButton } from './ReadAloudButton.js'
 import { CopyButton } from './CopyButton.js'
@@ -76,6 +77,9 @@ export const AssistantMessage = memo(function AssistantMessage({
           sources={view.sources}
         />
       ) : null}
+      {view.profiles.map((item) => (
+        <Sts2ProfileEmbed key={item.key} profile={item.profile} />
+      ))}
       {waiting ? (
         <div className={styles.waiting}>
           {[0, 1, 2].map((index) => (
