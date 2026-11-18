@@ -53,9 +53,9 @@ Settings → Data → Delete all chats clears all local conversations, original 
 | `pnpm lint`   | Lint with oxlint             |
 | `pnpm format` | Format with oxfmt            |
 
-[rspack.config.ts](rspack.config.ts) uses `https://api.deepseek.com` by default. Use `createConfig({ apiOrigin, devServer })` to customize the API origin and development server proxy.
+[rspack.config.ts](rspack.config.ts) pins `SITE_BUILD` for this deployment: same-origin OpenCode Go at `/api`, with the API key injected by nginx. `pnpm build` does not read `PA_*` environment variables. A production build that drifts from `SITE_BUILD` fails, and `scripts/assert-site-build.mjs` checks the emitted bundle.
 
-Chat uses `deepseek-flash` by default through Anthropic-compatible Messages / Files APIs. Speech features use ASR / TTS endpoints. Requests include extensions for search, link reading, titles, and `latest_reminder`, so the configured service must support the corresponding capabilities. Supported attachment formats are determined by server-side validation.
+Chat uses `deepseek-v4.1-flash` through the OpenCode Go gateway. Requests include extensions for search, link reading, titles, and `latest_reminder`, so the configured service must support the corresponding capabilities. Supported attachment formats are determined by server-side validation.
 
 ```text
 src/

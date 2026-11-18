@@ -38,88 +38,139 @@ type ConfigOptions = {
   devServer?: Configuration['devServer']
 }
 
-const env = (name: string, fallback: string) => process.env[name] ?? fallback
+/**
+ * agent.cornhub.art 的线上配置。`pnpm build` 与 `pnpm dev` 都用这一份，不读 PA_* 环境变量。
+ * 密钥由 nginx 注入；proxyMode 必须打开，否则前端会弹出 API Key 设置。
+ */
+const SITE_BUILD = {
+  apiOrigin: '',
+  apiBasePath: '/api',
+  verifyPath: '/api/models',
+  apiVendor: 'opencode' as ApiVendor,
+  proxyMode: true,
+  chatModel: 'deepseek-v4.1-flash',
+  publicPath: '/',
+}
 
-/** 创建构建配置，支持自定义 API 地址和开发服务器选项 */
+/** 创建构建配置。生产模式只接受 SITE_BUILD，避免打出 DeepSeek 直连包。 */
 export const createConfig = ({
-  apiOrigin = env('PA_API_ORIGIN', 'https://api.deepseek.com'),
-  apiBasePath = env('PA_API_BASE_PATH', '/anthropic/v1'),
-  verifyPath = env('PA_VERIFY_PATH', '/models'),
-  apiVendor = env('PA_API_VENDOR', 'deepseek') as ApiVendor,
-  proxyMode = env('PA_PROXY_MODE', 'false') === 'true',
-  chatModel = env('PA_CHAT_MODEL', 'deepseek-flash'),
-  publicPath = env('PA_PUBLIC_PATH', 'auto'),
+  apiOrigin = SITE_BUILD.apiOrigin,
+  apiBasePath = SITE_BUILD.apiBasePath,
+  verifyPath = SITE_BUILD.verifyPath,
+  apiVendor = SITE_BUILD.apiVendor,
+  proxyMode = SITE_BUILD.proxyMode,
+  chatModel = SITE_BUILD.chatModel,
+  publicPath = SITE_BUILD.publicPath,
   devServer,
-}: ConfigOptions = {}): Configuration => ({
-  mode: dev ? 'development' : 'production',
-  entry: './src/main.tsx',
-  output: {
-    path: path.resolve(root, 'dist'),
-    // 默认按脚本地址推导；SPA 路径路由（/a/chat/s/<id>）需要绝对前缀 /
-    publicPath,
-    filename: 'static/js/[name].[contenthash:8].js',
-    chunkFilename: 'static/js/async/[name].[contenthash:8].js',
-    cssFilename: 'static/css/[name].[contenthash:8].css',
-    cssChunkFilename: 'static/css/async/[name].[contenthash:8].css',
-    assetModuleFilename: 'static/media/[name].[contenthash:8][ext]',
-    clean: true,
-  },
-  devtool: dev ? 'cheap-module-source-map' : false,
-  // 开发模式预编译异步模块，保持首次加载代码高亮和公式时的页面状态
-  lazyCompilation: false,
-  resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
-    // 将 .js 导入路径解析到同名 .ts、.tsx 或 .js 文件
-    extensionAlias: { '.js': ['.ts', '.tsx', '.js'] },
-  },
-  module: {
-    // CSS Modules 使用默认导出：`import styles from './x.module.css'`
-    parser: { 'css/module': { namedExports: false } },
-    generator: { 'css/module': { localIdentName: '[local]-[hash:6]' } },
-    rules: [
-      { test: /\.module\.css$/, type: 'css/module', use: [cssLoader] },
-      { test: /\.css$/, exclude: /\.module\.css$/, type: 'css', use: [cssLoader] },
-      {
-        test: /\.(j|t)sx?$/,
-        exclude: /[\\/]node_modules[\\/]/,
-        loader: 'builtin:swc-loader',
-        options: {
-          jsc: {
-            parser: { syntax: 'typescript', tsx: true },
-            transform: { react: { runtime: 'automatic', development: dev } },
-            externalHelpers: true,
+}: ConfigOptions = {}): Configuration => {
+  if (!dev) {
+    const actual = {
+      apiOrigin,
+      apiBasePath,
+      verifyPath,
+      apiVendor,
+      proxyMode,
+      chatModel,
+      publicPath,
+    }
+    const mismatches = (Object.keys(SITE_BUILD) as (keyof typeof SITE_BUILD)[]).filter(
+      (key) => actual[key] !== SITE_BUILD[key]
+    )
+    if (mismatches.length > 0) {
+      throw new Error(
+        `生产构建必须使用 OpenCode 同源代理，不能退回 DeepSeek 直连。不一致字段：${mismatches.join(', ')}。配置在 rspack.config.ts 的 SITE_BUILD。`
+      )
+    }
+  }
+  return {
+    mode: dev ? 'development' : 'production',
+    entry: './src/main.tsx',
+    output: {
+      path: path.resolve(root, 'dist'),
+      // 绝对前缀 /，配合 nginx 的 try_files 支持会话深链接 /a/chat/s/<id>
+      publicPath,
+      filename: 'static/js/[name].[contenthash:8].js',
+      chunkFilename: 'static/js/async/[name].[contenthash:8].js',
+      cssFilename: 'static/css/[name].[contenthash:8].css',
+      cssChunkFilename: 'static/css/async/[name].[contenthash:8].css',
+      assetModuleFilename: 'static/media/[name].[contenthash:8][ext]',
+      clean: true,
+    },
+    devtool: dev ? 'cheap-module-source-map' : false,
+    // 开发模式预编译异步模块，保持首次加载代码高亮和公式时的页面状态
+    lazyCompilation: false,
+    resolve: {
+      extensions: ['.tsx', '.ts', '.js'],
+      // 将 .js 导入路径解析到同名 .ts、.tsx 或 .js 文件
+      extensionAlias: { '.js': ['.ts', '.tsx', '.js'] },
+    },
+    module: {
+      // CSS Modules 使用默认导出：`import styles from './x.module.css'`
+      parser: { 'css/module': { namedExports: false } },
+      generator: { 'css/module': { localIdentName: '[local]-[hash:6]' } },
+      rules: [
+        { test: /\.module\.css$/, type: 'css/module', use: [cssLoader] },
+        { test: /\.css$/, exclude: /\.module\.css$/, type: 'css', use: [cssLoader] },
+        {
+          test: /\.(j|t)sx?$/,
+          exclude: /[\\/]node_modules[\\/]/,
+          loader: 'builtin:swc-loader',
+          options: {
+            jsc: {
+              parser: { syntax: 'typescript', tsx: true },
+              transform: { react: { runtime: 'automatic', development: dev } },
+              externalHelpers: true,
+            },
+            env: { targets },
           },
-          env: { targets },
+          type: 'javascript/auto',
         },
-        type: 'javascript/auto',
-      },
-      { test: /\.(woff2?|ttf)$/, type: 'asset/resource' },
-    ],
-  },
-  plugins: [
-    // 经典 defer 脚本支持 file:// 页面的资源加载
-    new rspack.HtmlRspackPlugin({
-      template: './src/index.html',
-      scriptLoading: 'defer',
-      meta: { 'application-version': version },
-    }),
-    new rspack.DefinePlugin({
-      __API_PROVIDER__: JSON.stringify({
-        vendor: apiVendor,
-        origin: apiOrigin,
-        apiBasePath,
-        verifyPath,
-        proxyMode,
-        model: chatModel,
+        { test: /\.(woff2?|ttf)$/, type: 'asset/resource' },
+      ],
+    },
+    plugins: [
+      // 经典 defer 脚本支持 file:// 页面的资源加载
+      new rspack.HtmlRspackPlugin({
+        template: './src/index.html',
+        favicon: './src/favicon.svg',
+        scriptLoading: 'defer',
+        meta: { 'application-version': version },
       }),
-    }),
-    new rspack.CopyRspackPlugin({
-      patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
-    }),
-  ],
-  performance: { hints: false },
-  devServer: { port: 8090, ...devServer },
-})
+      new rspack.DefinePlugin({
+        __API_PROVIDER__: JSON.stringify({
+          vendor: apiVendor,
+          origin: apiOrigin,
+          apiBasePath,
+          verifyPath,
+          proxyMode,
+          model: chatModel,
+        }),
+      }),
+      new rspack.CopyRspackPlugin({
+        patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
+      }),
+    ],
+    performance: { hints: false },
+    devServer: {
+      port: 8090,
+      // 与线上一致：/api 走 nginx 注入密钥，搜索和文档提取走本机服务
+      proxy: [
+        {
+          context: ['/api'],
+          target: 'https://agent.cornhub.art',
+          changeOrigin: true,
+          secure: true,
+        },
+        {
+          context: ['/search', '/extract', '/sts2'],
+          target: 'http://127.0.0.1:8790',
+          changeOrigin: true,
+        },
+      ],
+      ...devServer,
+    },
+  }
+}
 
 // eslint-disable-next-line import/no-default-export
-export default defineConfig(createConfig())
+export default defineConfig(createConfig(SITE_BUILD))

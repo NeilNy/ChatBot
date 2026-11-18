@@ -95,19 +95,12 @@
 
 ## 前端构建
 
-OpenCode Go 使用同源代理注入密钥，前端只持有占位 Key：
+直接执行 `pnpm build`。线上参数写在 `rspack.config.ts` 的 `SITE_BUILD` 里，不读环境变量：
 
-```bash
-PA_API_ORIGIN='' \
-PA_API_BASE_PATH='/api' \
-PA_VERIFY_PATH='/api/models' \
-PA_API_VENDOR=opencode \
-PA_PROXY_MODE=true \
-PA_CHAT_MODEL='deepseek-v4.1-flash' \
-PA_PUBLIC_PATH='/' \
-pnpm build
-```
+- 同源 `/api`，OpenCode Go，`proxyMode` 打开。前端只用占位 Key，不弹出 API Key 设置。
+- 模型 `deepseek-v4.1-flash`。
+- `publicPath` 为 `/`，资源走 `/static/...`，配合 nginx 的 `try_files ... /index.html` 支持会话深链接 `/a/chat/s/<session-id>`。
 
-`PA_PUBLIC_PATH=/` 让资源使用 `/static/...` 绝对路径，配合 nginx 的 `try_files ... /index.html` 支持会话深链接 `/a/chat/s/<session-id>`；默认 `auto` 保留上游的 `file://` 用法。
+生产构建若改回 DeepSeek 直连会失败；产物里还必须出现 `proxyMode:!0` 与 `/static/js/`，否则 `pnpm build` 以非零退出。
 
 前端声明 `search_web` 客户端工具；模型返回 `tool_use` 后，浏览器调用 `/search`，再把 `tool_result` 回传给模型继续生成。单条回复最多执行 3 次搜索。
