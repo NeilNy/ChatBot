@@ -6,7 +6,6 @@ import type {
   WebSearchResult,
   WebSearchToolResultBlock,
 } from '../api/types.js'
-import type { Sts2Profile } from '../api/sts2.js'
 import type { AssistantMessage, ThinkingPart } from './types.js'
 
 /**
@@ -94,8 +93,6 @@ export type ReplyView = {
   sources: Source[]
   /** 搜索到的网页（去重），用于底部汇总与搜索结果列表 */
   searchResults: Source[]
-  /** 玩家档案内嵌块，放在正文之后展示 */
-  profiles: { key: string; profile: Sts2Profile }[]
 }
 
 export const getSiteName = (url: string) => {
@@ -203,7 +200,6 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
 
   const registry = new SourceRegistry()
   const searchResults: Source[] = []
-  const profiles: { key: string; profile: Sts2Profile }[] = []
   const steps: Step[] = []
   const mergedSearch = new Map<ServerToolKind, SearchStep>()
   let mergedThinking: ThinkingStep | null = null
@@ -265,10 +261,6 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
         mergedThinking = { type: 'thinking', key: `thinking-${index}`, blocks: [block] }
         steps.push(mergedThinking)
       }
-      return
-    }
-    if (block.type === 'sts2_profile') {
-      profiles.push({ key: `profile-${block.id}`, profile: block.profile })
       return
     }
     if (block.type === 'client_tool') {
@@ -385,10 +377,14 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
   const answer = pendingText.length > 0 ? joinTextBlocks(pendingText, registry) : null
   return {
     steps,
-    answer: answer && answer.text ? answer : null,
+    answer: answer
+      ? {
+          markdown: answer.markdown,
+          text: answer.text.replace(/```html-embed[\s\S]*?```/g, '').trim(),
+        }
+      : null,
     sources: registry.list,
     searchResults,
-    profiles,
   }
 }
 

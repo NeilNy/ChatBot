@@ -1,5 +1,4 @@
 import type { TranslationMessage } from '../../i18n/index.js'
-import type { Sts2Profile } from '../api/sts2.js'
 import type { ApiErrorKind } from '../api/client.js'
 import type {
   ChatModel,
@@ -78,19 +77,7 @@ export type ClientToolPart = {
   endedAt?: number
 }
 
-/** 杀戮尖塔玩家档案：游戏风内嵌块，只在界面展示 */
-export type Sts2ProfilePart = {
-  type: 'sts2_profile'
-  id: string
-  profile: Sts2Profile
-}
-
-export type ReplyBlock =
-  | ThinkingPart
-  | TextPart
-  | ServerToolBlock
-  | ClientToolPart
-  | Sts2ProfilePart
+export type ReplyBlock = ThinkingPart | TextPart | ServerToolBlock | ClientToolPart
 
 /**
  * pending：已发出请求，还没收到事件；streaming：正在接收；

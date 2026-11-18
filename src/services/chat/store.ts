@@ -1393,8 +1393,21 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                 if (command === 'player-profile') {
                   profile = result.data
                   if (profile) {
-                    text +=
-                      '\n\n（完整战绩已在界面内嵌块展示。回答请用 3-5 句话总结亮点和短板，不要逐行重复表格。）'
+                    text = [
+                      '玩家档案数据（JSON）：',
+                      JSON.stringify(profile),
+                      '',
+                      '请按以下格式回答：',
+                      '1. 先用 3-5 句话总结战绩亮点和短板；',
+                      '2. 然后输出一个 ```html-embed 代码块，生成一张杀戮尖塔2风格的完整 HTML 战绩卡。',
+                      '',
+                      'HTML 要求：',
+                      '- 只输出 HTML 片段（不要 <!doctype>/<html>/<head>/<body>），样式放 <style>，脚本放 <script>；',
+                      '- 单文件、内联 CSS/JS，不使用外部图片、字体或网络请求（图片只能用内联 SVG 或 data URI）；',
+                      '- 根元素会带 data-theme="light" 或 "dark"，请用 html[data-theme="light"] / html[data-theme="dark"] 提供深浅两套配色；',
+                      '- 卡片包含玩家名、胜率、总局数、胜负、最高 A；总览/角色/最近对局/成长 四个 tab；最近对局支持胜利/失败筛选；',
+                      '- 数据全部来自上面的 JSON，不要编造；风格用深色羊皮纸、暗金、血红、暗紫和衬线标题。',
+                    ].join('\n')
                   }
                 }
               } catch (error) {
@@ -1418,21 +1431,6 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             updateReply(sessionId, reply)
             persist(sessionId)
 
-            if (profile) {
-              reply = {
-                ...reply,
-                blocks: [
-                  ...reply.blocks,
-                  {
-                    type: 'sts2_profile',
-                    id: `profile_${call.id}`,
-                    profile,
-                  },
-                ],
-              }
-              updateReply(sessionId, reply)
-              persist(sessionId)
-            }
 
             toolResults.push({
               type: 'tool_result',

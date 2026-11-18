@@ -10,6 +10,7 @@ import type {
 } from 'mdast'
 import { CitationLink } from '../search/CitationLink.js'
 import { CodeBlock } from './CodeBlock.js'
+import { HtmlEmbed } from './HtmlEmbed.js'
 import { ImageAsLink, Link } from './Link.js'
 import { InlineMath, MathBlock } from './MathFormula.js'
 
@@ -192,6 +193,9 @@ const MarkdownBlockContentOrDefinitionContent = memo(
             </p>
           )
         case 'code':
+          if (node.lang === 'html-embed') {
+            return <HtmlEmbed key={index} html={node.value} loading={loading} />
+          }
           return (
             <CodeBlock
               key={index}

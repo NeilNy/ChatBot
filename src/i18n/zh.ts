@@ -47,6 +47,8 @@ export const zh = {
   mermaidSwitchLabel: 'Mermaid 图表与代码切换',
   toolSearchIntro: '搜索',
   toolCalling: '正在调用工具',
+  htmlEmbedGenerating: '正在生成内嵌块…',
+  htmlEmbedTitle: '游戏数据内嵌块',
   toolRunning: '查询中…',
   toolDone: '完成',
   toolFailed: '失败',
