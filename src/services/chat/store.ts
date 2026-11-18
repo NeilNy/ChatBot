@@ -6,7 +6,7 @@ import { defaultSystemPrompt } from './systemPrompt.js'
 import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
-import { querySts2, type Sts2Profile } from '../api/sts2.js'
+import { querySts2, type Sts2CardTemplate } from '../api/sts2.js'
 import type {
   AssistantBlockParam,
   ChatModel,
@@ -1334,6 +1334,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               if (typeof input.page_size === 'number') {
                 labelParts.push(`${input.page_size} 条`)
               }
+              if (typeof input.run_id === 'number') {
+                labelParts.push(`#${input.run_id}`)
+              }
             }
             const toolBlockId = `client_${call.id}`
             reply = {
@@ -1355,7 +1358,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
 
             let text = ''
             let ok = false
-            let profile: Sts2Profile | undefined
+            let card: { template: Sts2CardTemplate; data: unknown } | undefined
             if (call.name === 'sts2_query') {
               const command =
                 typeof input.command === 'string' ? input.command.trim() : ''
@@ -1372,6 +1375,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               addText('--name', input.name)
               addText('--type', input.type)
               addText('--mode', input.mode)
+              if (typeof input.run_id === 'number' && Number.isFinite(input.run_id)) {
+                args.push('--id', String(Math.trunc(input.run_id)))
+              }
               for (const [key, flag] of [
                 ['page_size', '--page-size'],
                 ['page', '--page'],
@@ -1390,25 +1396,49 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                 const result = await querySts2(command, args, controller.signal)
                 text = result.text
                 ok = result.ok
-                if (command === 'player-profile') {
-                  profile = result.data
-                  if (profile) {
-                    text = [
-                      '玩家档案数据（JSON）：',
-                      JSON.stringify(profile),
-                      '',
-                      '请按以下格式回答：',
-                      '1. 先用 2-3 句话总结战绩亮点和短板；',
-                      '2. 然后输出一个 ```html-embed 代码块，生成一张紧凑的杀戮尖塔2风格战绩卡。',
-                      '',
-                      'HTML 要求（尽量控制在 5000 字符以内，生成要快）：',
-                      '- 只输出 HTML 片段（不要 <!doctype>/<html>/<head>/<body>），样式放 <style>，不要用复杂 JS；',
-                      '- 单文件、内联 CSS，不使用外部图片、字体或网络请求（图片只能用内联 SVG 或 data URI）；',
-                      '- 根元素会带 data-theme="light" 或 "dark"，请用 html[data-theme="light"] / html[data-theme="dark"] 提供深浅两套配色；',
-                      '- 卡片包含：玩家名、胜率、总局数、胜负、最高 A、平均层数、平均时长；最近对局用 <details> 折叠，列出最近 8 局（胜负、A、层数、角色、日期）；',
-                      '- 不需要 tabs、筛选按钮、图表或复杂动画；数据全部来自上面的 JSON，不要编造；',
-                      '- 风格用深色羊皮纸、暗金、血红、暗紫和衬线标题，紧凑一点。',
-                    ].join('\n')
+                const template = command === 'player-profile' ? 'profile' : command
+                if (
+                  result.data &&
+                  ['profile', 'cards', 'relics', 'run', 'overview'].includes(template)
+                ) {
+                  card = {
+                    template: template as Sts2CardTemplate,
+                    data: result.data,
+                  }
+                  if (command === 'run') {
+                    const runData = result.data as {
+                      run?: {
+                        run_id?: number
+                        player_name?: string
+                        display_name?: { zh?: string; en?: string }
+                        ascension?: number
+                        is_victory?: boolean
+                        abandoned?: boolean
+                        death_cause?: string
+                        death_cause_name?: { zh?: string; en?: string }
+                        floor_reached?: number
+                        duration_sec?: number
+                        created_at?: string
+                      }
+                      combats?: unknown[]
+                    }
+                    const run = runData.run
+                    text = run
+                      ? [
+                          `对局 #${run.run_id ?? '—'}：${run.player_name ?? ''} ${run.display_name?.zh ?? ''} A${run.ascension ?? 0}`,
+                          `结果：${run.is_victory ? '胜利' : run.abandoned ? '放弃' : '失败'}，${run.floor_reached ?? 0} 层，时长 ${Math.round((run.duration_sec ?? 0) / 60)} 分钟，${String(run.created_at ?? '').slice(0, 10)}`,
+                          run.death_cause
+                            ? `死因：${run.death_cause_name?.zh ?? run.death_cause}`
+                            : '',
+                          `战斗记录 ${Array.isArray(runData.combats) ? runData.combats.length : 0} 场（完整列表见界面固定卡片）。`,
+                          '界面已展示对局卡片。回答用 2-3 句话总结，不要逐条重复战斗表。',
+                        ]
+                          .filter(Boolean)
+                          .join('\n')
+                      : text.slice(0, 6000)
+                  } else {
+                    text +=
+                      '\n\n（界面已展示固定卡片，回答用 2-3 句总结即可，不要重复表格。）'
                   }
                 }
               } catch (error) {
@@ -1432,6 +1462,22 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             updateReply(sessionId, reply)
             persist(sessionId)
 
+            if (card) {
+              reply = {
+                ...reply,
+                blocks: [
+                  ...reply.blocks,
+                  {
+                    type: 'sts2_card',
+                    id: `card_${call.id}`,
+                    template: card.template,
+                    data: card.data,
+                  },
+                ],
+              }
+              updateReply(sessionId, reply)
+              persist(sessionId)
+            }
 
             toolResults.push({
               type: 'tool_result',

@@ -20,6 +20,7 @@ export type Sts2Run = {
   is_victory?: boolean
   abandoned?: boolean
   death_cause?: string
+  death_cause_name?: { en?: string; zh?: string }
   floor_reached?: number
   duration_sec?: number
   game_version?: string
@@ -75,10 +76,92 @@ export type Sts2Profile = {
   }[]
 }
 
+export type Sts2CardTemplate = 'profile' | 'cards' | 'relics' | 'run' | 'overview'
+
+export type Sts2CardRow = {
+  rank?: number
+  card_id?: string
+  card_name?: { en?: string; zh?: string }
+  display_name?: { en?: string; zh?: string }
+  character_name?: { en?: string; zh?: string }
+  character?: string
+  skada_score?: number
+  pick_rate?: number
+  win_rate_picked?: number
+  win_rate_skipped?: number
+  win_rate_delta?: number
+  rarity?: string
+}
+
+export type Sts2CardsData = {
+  cards?: Sts2CardRow[]
+  character_filter_name?: { en?: string; zh?: string }
+  pagination?: { total_pages?: number }
+}
+
+export type Sts2RelicRow = {
+  rank?: number
+  relic_id?: string
+  relic_name?: { en?: string; zh?: string }
+  display_name?: { en?: string; zh?: string }
+  hold_rate?: number
+  pick_rate?: number
+  win_rate_picked?: number
+  win_rate_skipped?: number
+  rarity?: string
+}
+
+export type Sts2RelicsData = {
+  relics?: Sts2RelicRow[]
+  character_filter_name?: { en?: string; zh?: string }
+  pagination?: { total_pages?: number }
+}
+
+export type Sts2Combat = {
+  floor?: number
+  encounter?: string
+  encounter_name?: { en?: string; zh?: string }
+  encounter_display_name?: { en?: string; zh?: string }
+  enc_type?: string
+  type?: string
+  turns?: number
+  won?: boolean
+}
+
+export type Sts2RunData = {
+  run?: Sts2Run & { player_name?: string; seed?: string; player_count?: number }
+  combats?: Sts2Combat[]
+}
+
+export type Sts2OverviewData = {
+  total_runs?: number
+  total_combats?: number
+  unique_players?: number
+  win_rate?: number
+  average_floor?: number
+  avg_time?: number
+  total_play_hours?: number
+  character_win_rates?: {
+    character?: string
+    total_runs?: number
+    wins?: number
+    win_rate?: number
+    display_name?: { en?: string; zh?: string }
+    character_name?: { en?: string; zh?: string }
+  }[]
+}
+
+export type Sts2CardData =
+  | Sts2Profile
+  | Sts2CardsData
+  | Sts2RelicsData
+  | Sts2RunData
+  | Sts2OverviewData
+
 export type Sts2Result = {
   ok: boolean
   text: string
-  data?: Sts2Profile
+  data?: Sts2CardData
 }
 
 /** 调用本地 /sts2 代理执行白名单命令（sts2-analytics 脚本） */
@@ -103,7 +186,7 @@ export const querySts2 = async (
     text: typeof body.text === 'string' ? body.text : '',
     data:
       typeof body.data === 'object' && body.data !== null
-        ? (body.data as Sts2Profile)
+        ? (body.data as Sts2CardData)
         : undefined,
   }
 }

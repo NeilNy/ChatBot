@@ -1,5 +1,6 @@
 import type { TranslationMessage } from '../../i18n/index.js'
 import type { ApiErrorKind } from '../api/client.js'
+import type { Sts2CardTemplate } from '../api/sts2.js'
 import type {
   ChatModel,
   MessageUsage,
@@ -77,7 +78,20 @@ export type ClientToolPart = {
   endedAt?: number
 }
 
-export type ReplyBlock = ThinkingPart | TextPart | ServerToolBlock | ClientToolPart
+/** 固定杀戮尖塔卡片：由工具命令召回，前端按 template 选择固定结构 */
+export type Sts2CardPart = {
+  type: 'sts2_card'
+  id: string
+  template: Sts2CardTemplate
+  data: unknown
+}
+
+export type ReplyBlock =
+  | ThinkingPart
+  | TextPart
+  | ServerToolBlock
+  | ClientToolPart
+  | Sts2CardPart
 
 /**
  * pending：已发出请求，还没收到事件；streaming：正在接收；

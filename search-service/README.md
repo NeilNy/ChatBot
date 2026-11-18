@@ -20,7 +20,7 @@
 - 命令：`overview/cards/card/relics/monsters/curses/upgrades/encounters/leaderboard/player-search/player-profile/run/versions`
 - 请求：`{"command":"cards","args":["--character","IRONCLAD","--page-size","10"]}`
 - 超时 30 秒，返回文本最多 20000 字
-- `player-profile` 额外返回 `data`（summary/characters/percentiles/records/recent_runs），前端渲染成 SKADA 游戏风可交互内嵌块
+- `player-profile` / `cards` / `relics` / `run` / `overview` 额外返回 `data`，前端按命令渲染固定 SKADA 卡片（玩家档案/卡牌排行/遗物排行/对局详情/环境总览）
 
 ## 部署
 

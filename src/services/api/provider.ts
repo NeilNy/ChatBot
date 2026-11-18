@@ -50,7 +50,8 @@ export const CLIENT_STS2_TOOL: ClientTool = {
     'command=cards 查卡牌排名，command=relics 查遗物排名，command=overview 查总览，' +
     'command=versions 查可用版本。问某玩家战绩/档案时直接用 command=player-profile 并传 name，不要先 player-search。' +
     '角色用 IRONCLAD/SILENT/DEFECT/REGENT/NECROBINDER；' +
-    '排序用 skada_score/win_rate_picked/win_rate_skipped/delta/pick_rate/hold_rate。',
+    '排序用 skada_score/win_rate_picked/win_rate_skipped/delta/pick_rate/hold_rate。' +
+    '查询结果会自动在回答下方展示固定卡片；请用 2-3 句话总结，不要重复表格或生成 HTML。',
   input_schema: {
     type: 'object',
     properties: {
@@ -96,6 +97,7 @@ export const CLIENT_STS2_TOOL: ClientTool = {
       asc_max: { type: 'integer', description: '最高进阶等级' },
       version: { type: 'string', description: '游戏版本，如 v0.113；不确定时先查 versions' },
       name: { type: 'string', description: '卡牌名或玩家名，用于 card / player-search / player-profile' },
+      run_id: { type: 'integer', description: '对局 ID，用于 command=run' },
       type: {
         type: 'string',
         enum: ['normal', 'elite', 'boss', 'event', 'shop', 'rest'],

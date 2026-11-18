@@ -211,6 +211,51 @@ def _xlsx_text(data: bytes) -> str:
     return "\n".join(lines)
 
 
+def _sts2_endpoint(command: str, args: list[str]) -> tuple[str | None, dict | None]:
+    def value(flag: str) -> str | None:
+        return _arg_value(args, flag)
+
+    def number(flag: str) -> int | None:
+        raw = value(flag)
+        try:
+            return int(raw) if raw is not None else None
+        except ValueError:
+            return None
+
+    if command == "player-profile":
+        return "/api/player/profile", {"name": value("--name")} if value("--name") else (None, None)
+    if command == "run":
+        run_id = value("--id")
+        return (f"/api/runs/{run_id}", None) if run_id else (None, None)
+    if command in {"cards", "relics"}:
+        params: dict = {
+            "page": str(number("--page") or 1),
+            "page_size": str(number("--page-size") or 20),
+            "sort_by": value("--sort") or ("skada_score" if command == "cards" else "win_rate_picked"),
+            "sort_dir": "asc" if "--asc" in args else "desc",
+        }
+        for flag, key in (("--character", "char"), ("--version", "version")):
+            if value(flag):
+                params[key] = value(flag)
+        for flag, key in (("--asc-min", "asc_min"), ("--asc-max", "asc_max")):
+            if number(flag) is not None:
+                params[key] = number(flag)
+        return f"/api/{command}", params
+    if command == "overview":
+        params = {}
+        if value("--character"):
+            params["char"] = value("--character")
+        if value("--version"):
+            params["version"] = value("--version")
+        if value("--mode"):
+            params["game_mode"] = value("--mode")
+        for flag, key in (("--asc-min", "asc_min"), ("--asc-max", "asc_max")):
+            if number(flag) is not None:
+                params[key] = number(flag)
+        return "/api/overview", params or None
+    return None, None
+
+
 def _load_sts2_module():
     spec = importlib.util.spec_from_file_location("sts2_api", STS2_SCRIPT)
     if spec is None or spec.loader is None:
@@ -348,14 +393,15 @@ class Handler(BaseHTTPRequestHandler):
             "text": text[:STS2_MAX_OUTPUT],
             "truncated": len(text) > STS2_MAX_OUTPUT,
         }
-        # 玩家档案额外返回结构化数据，前端用游戏风内嵌块渲染
-        if command == "player-profile":
-            name = _arg_value(clean, "--name")
-            if name:
+        # 固定卡片模板：额外返回原始 JSON，前端按 command 选择卡片结构
+        if command in {"player-profile", "cards", "relics", "run", "overview"}:
+            endpoint, params = _sts2_endpoint(command, clean)
+            if endpoint:
                 try:
-                    profile = _load_sts2_module().api("/api/player/profile", {"name": name})
-                    if isinstance(profile, dict):
-                        payload["data"] = profile
+                    data = _load_sts2_module().api(endpoint, params)
+                    if isinstance(data, dict):
+                        payload["data"] = data
+                        payload["template"] = "profile" if command == "player-profile" else command
                 except Exception as exc:  # noqa: BLE001 - UI 缺数据时退回纯文本
                     payload["data_error"] = str(exc)[:200]
         self._json(200, payload)
