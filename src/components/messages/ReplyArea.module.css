@@ -314,3 +314,70 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.clientToolRow {
+  align-items: flex-start;
+  height: auto;
+  padding: 5px 0;
+}
+
+.clientToolIcon {
+  margin-top: 3px;
+}
+
+.clientToolBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: calc(100% - 24px);
+}
+
+.clientToolHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.clientToolLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clientToolStatus {
+  flex-shrink: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.clientToolFailed {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.clientToolOutput {
+  max-height: 320px;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--dsw-alias-markdown-tag);
+  color: var(--dsw-alias-label-secondary);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.profileStep {
+  position: relative;
+  padding: 4px 0 4px 0;
+}

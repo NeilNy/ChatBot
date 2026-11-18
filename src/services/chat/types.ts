@@ -1,4 +1,5 @@
 import type { TranslationMessage } from '../../i18n/index.js'
+import type { Sts2Profile } from '../api/sts2.js'
 import type { ApiErrorKind } from '../api/client.js'
 import type {
   ChatModel,
@@ -63,7 +64,33 @@ export type TextPart = {
 }
 
 /** 服务端工具调用与结果块按协议原样保存；历史请求只回传 read_link 调用与结果 */
-export type ReplyBlock = ThinkingPart | TextPart | ServerToolBlock
+/** 客户端工具（如杀戮尖塔查询）的展示块；只用于界面，不回传给模型 */
+export type ClientToolPart = {
+  type: 'client_tool'
+  id: string
+  name: string
+  /** 链条上显示的一行摘要，如 cards · IRONCLAD · win_rate_picked */
+  label: string
+  input: unknown
+  output?: string
+  isError?: boolean
+  startedAt?: number
+  endedAt?: number
+}
+
+/** 杀戮尖塔玩家档案：游戏风内嵌块，只在界面展示 */
+export type Sts2ProfilePart = {
+  type: 'sts2_profile'
+  id: string
+  profile: Sts2Profile
+}
+
+export type ReplyBlock =
+  | ThinkingPart
+  | TextPart
+  | ServerToolBlock
+  | ClientToolPart
+  | Sts2ProfilePart
 
 /**
  * pending：已发出请求，还没收到事件；streaming：正在接收；

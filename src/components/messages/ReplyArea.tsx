@@ -12,6 +12,7 @@ import {
   IconRightUpOutline14,
   IconSearchOutline16,
   IconSearchWarningOutline16,
+  IconSpadeOutline14,
   IconThinkOutline16,
 } from '../base/icons.js'
 import type { AssistantMessage } from '../../services/chat/types.js'
@@ -27,11 +28,13 @@ import {
   type SearchStep,
   type Source,
   type Step,
+  type ToolStep,
 } from '../../services/chat/view.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
+import { Sts2ProfileEmbed } from './Sts2ProfileEmbed.js'
 import styles from './ReplyArea.module.css'
 import './thinking.markdown.css'
 
@@ -105,7 +108,11 @@ export const ReplyArea = memo(function ReplyArea({
 })
 
 const stepKey = (step: Step, index: number) =>
-  step.type === 'thinking' || step.type === 'text' || step.type === 'search'
+  step.type === 'thinking' ||
+  step.type === 'text' ||
+  step.type === 'search' ||
+  step.type === 'tool' ||
+  step.type === 'profile'
     ? step.key
     : `${step.type}-${index}`
 
@@ -152,6 +159,14 @@ const StepItem = ({
       )
     case 'search':
       return <SearchRow step={step} message={message} streaming={streaming} isLast={isLast} />
+    case 'tool':
+      return <ClientToolRow step={step} isLast={isLast} />
+    case 'profile':
+      return (
+        <div className={clsx(!isLast && styles.withLine, styles.profileStep)}>
+          <Sts2ProfileEmbed profile={step.profile} />
+        </div>
+      )
     case 'open':
       return <OpenRow step={step} sources={sources} isLast={isLast} />
     case 'find':
@@ -180,6 +195,47 @@ const ContentItem = ({
     {children}
   </div>
 )
+
+/** 客户端工具：一行摘要 + 展开查看原始文本结果 */
+const ClientToolRow = ({ step, isLast }: { step: ToolStep; isLast: boolean }) => {
+  const t = useTranslate()
+  const [open, setOpen] = useState(false)
+  const wip = step.status === 'wip'
+  const failed = step.status === 'failed'
+  const expandable = !!step.output
+  return (
+    <div
+      className={clsx(styles.row, styles.clientToolRow, !isLast && styles.withLine)}
+    >
+      <span className={clsx(styles.rowIcon, styles.clientToolIcon)}>
+        {failed ? <IconBrowseWarningOutline16 /> : <IconSpadeOutline14 />}
+      </span>
+      <div className={styles.clientToolBody}>
+        <button
+          type="button"
+          className={styles.clientToolHeader}
+          disabled={!expandable}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span className={styles.clientToolLabel}>{step.label}</span>
+          <span className={clsx(styles.clientToolStatus, failed && styles.clientToolFailed)}>
+            {t(wip ? 'toolRunning' : failed ? 'toolFailed' : 'toolDone')}
+          </span>
+          {expandable ? (
+            open ? (
+              <IconChevronDownOutline14 />
+            ) : (
+              <IconChevronRightOutline14 />
+            )
+          ) : null}
+        </button>
+        {open && step.output ? (
+          <pre className={styles.clientToolOutput}>{step.output}</pre>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 /** 搜索：普通搜索为「已阅读 N 个网页」，边想边搜为「搜索到 N 个网页」，点击打开搜索结果 */
 const SearchRow = ({

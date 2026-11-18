@@ -48,7 +48,7 @@ export const CLIENT_STS2_TOOL: ClientTool = {
   description:
     '查询杀戮尖塔2（Slay the Spire 2）Skada Analytics 数据。' +
     'command=cards 查卡牌排名，command=relics 查遗物排名，command=overview 查总览，' +
-    'command=versions 查可用版本，command=player-profile 查玩家档案。' +
+    'command=versions 查可用版本。问某玩家战绩/档案时直接用 command=player-profile 并传 name，不要先 player-search。' +
     '角色用 IRONCLAD/SILENT/DEFECT/REGENT/NECROBINDER；' +
     '排序用 skada_score/win_rate_picked/win_rate_skipped/delta/pick_rate/hold_rate。',
   input_schema: {

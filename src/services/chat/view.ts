@@ -6,6 +6,7 @@ import type {
   WebSearchResult,
   WebSearchToolResultBlock,
 } from '../api/types.js'
+import type { Sts2Profile } from '../api/sts2.js'
 import type { AssistantMessage, ThinkingPart } from './types.js'
 
 /**
@@ -63,10 +64,31 @@ export type ReadLinkStep = { type: 'read_link'; links: PageItem[] }
 
 export type ThinkingStep = { type: 'thinking'; key: string; blocks: ThinkingPart[] }
 
+/** 客户端工具（杀戮尖塔查询等）的调用步骤 */
+export type ToolStep = {
+  type: 'tool'
+  key: string
+  name: string
+  label: string
+  output: string | null
+  status: ToolStatus
+}
+
+/** 杀戮尖塔玩家档案内嵌块 */
+export type ProfileStep = { type: 'profile'; key: string; profile: Sts2Profile }
+
 /** 工具调用前输出的说明文字 */
 export type PreambleStep = { type: 'text'; key: string; markdown: string }
 
-export type Step = SearchStep | OpenStep | FindStep | ReadLinkStep | ThinkingStep | PreambleStep
+export type Step =
+  | SearchStep
+  | OpenStep
+  | FindStep
+  | ReadLinkStep
+  | ThinkingStep
+  | ToolStep
+  | ProfileStep
+  | PreambleStep
 
 export type ReplyView = {
   steps: Step[]
@@ -246,6 +268,35 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
       }
       return
     }
+    if (block.type === 'sts2_profile') {
+      flushPreamble()
+      steps.push({
+        type: 'profile',
+        key: `profile-${block.id}`,
+        profile: block.profile,
+      })
+      return
+    }
+    if (block.type === 'client_tool') {
+      flushPreamble()
+      const status: ToolStatus =
+        block.output === undefined
+          ? streaming
+            ? 'wip'
+            : 'failed'
+          : block.isError
+            ? 'failed'
+            : 'done'
+      steps.push({
+        type: 'tool',
+        key: `tool-${block.id}`,
+        name: block.name,
+        label: block.label,
+        output: block.output ?? null,
+        status,
+      })
+      return
+    }
     if (block.type !== 'server_tool_use') {
       return
     }
@@ -395,6 +446,9 @@ export const getAreaTitle = (
   }
   if (last?.type === 'read_link' && last.links.some((link) => link.status === 'wip')) {
     return translate('readingLink')
+  }
+  if (last?.type === 'tool' && last.status === 'wip') {
+    return translate('toolCalling')
   }
   return translate('messageThinking')
 }

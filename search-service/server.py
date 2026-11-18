@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import email
 import html
+import importlib.util
 import io
 import json
 import os
@@ -210,6 +211,22 @@ def _xlsx_text(data: bytes) -> str:
     return "\n".join(lines)
 
 
+def _load_sts2_module():
+    spec = importlib.util.spec_from_file_location("sts2_api", STS2_SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load sts2_api")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _arg_value(args: list[str], flag: str) -> str | None:
+    for index, arg in enumerate(args[:-1]):
+        if arg == flag:
+            return args[index + 1]
+    return None
+
+
 def extract_text(filename: str, data: bytes) -> tuple[str, bool]:
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext == "pdf":
@@ -325,15 +342,23 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         text = (proc.stdout or proc.stderr).decode("utf-8", "replace").strip()
-        self._json(
-            200,
-            {
-                "ok": proc.returncode == 0,
-                "command": command,
-                "text": text[:STS2_MAX_OUTPUT],
-                "truncated": len(text) > STS2_MAX_OUTPUT,
-            },
-        )
+        payload: dict = {
+            "ok": proc.returncode == 0,
+            "command": command,
+            "text": text[:STS2_MAX_OUTPUT],
+            "truncated": len(text) > STS2_MAX_OUTPUT,
+        }
+        # 玩家档案额外返回结构化数据，前端用游戏风内嵌块渲染
+        if command == "player-profile":
+            name = _arg_value(clean, "--name")
+            if name:
+                try:
+                    profile = _load_sts2_module().api("/api/player/profile", {"name": name})
+                    if isinstance(profile, dict):
+                        payload["data"] = profile
+                except Exception as exc:  # noqa: BLE001 - UI 缺数据时退回纯文本
+                    payload["data_error"] = str(exc)[:200]
+        self._json(200, payload)
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = urlparse(self.path).path

@@ -6,7 +6,7 @@ import { defaultSystemPrompt } from './systemPrompt.js'
 import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
-import { querySts2 } from '../api/sts2.js'
+import { querySts2, type Sts2Profile } from '../api/sts2.js'
 import type {
   AssistantBlockParam,
   ChatModel,
@@ -1033,6 +1033,22 @@ const applyLocalTitle = (sessionId: string) => {
 const MAX_TOOL_ROUNDS = 3
 /** 回传给模型的搜索结果上限，防止上下文膨胀 */
 const MAX_TOOL_RESULT_CHARS = 12000
+/** 杀戮尖塔命令的中文展示名 */
+const STS2_COMMAND_LABELS: Record<string, string> = {
+  overview: '总览',
+  cards: '卡牌排名',
+  card: '卡牌详情',
+  relics: '遗物排名',
+  monsters: '怪物数据',
+  curses: '诅咒统计',
+  upgrades: '升级价值',
+  encounters: '对局数据',
+  leaderboard: '排行榜',
+  'player-search': '玩家搜索',
+  'player-profile': '玩家档案',
+  run: '对局详情',
+  versions: '版本',
+}
 
 /** 没有站点 Logo 时生成首字母头像，避免搜索结果只显示链接占位图标 */
 const letterIcon = (label: string): string => {
@@ -1300,6 +1316,46 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               continue
             }
 
+            // 非搜索工具：先插入展示块，让链条显示「查询中」
+            const labelParts: string[] = [
+              call.name === 'sts2_query' ? '杀戮尖塔' : call.name,
+            ]
+            if (call.name === 'sts2_query') {
+              if (typeof input.command === 'string' && input.command.trim()) {
+                const command = input.command.trim()
+                labelParts.push(STS2_COMMAND_LABELS[command] ?? command)
+              }
+              for (const key of ['character', 'sort', 'name'] as const) {
+                const value = input[key]
+                if (typeof value === 'string' && value.trim()) {
+                  labelParts.push(value.trim())
+                }
+              }
+              if (typeof input.page_size === 'number') {
+                labelParts.push(`${input.page_size} 条`)
+              }
+            }
+            const toolBlockId = `client_${call.id}`
+            reply = {
+              ...reply,
+              blocks: [
+                ...reply.blocks,
+                {
+                  type: 'client_tool',
+                  id: toolBlockId,
+                  name: call.name,
+                  label: labelParts.join(' · '),
+                  input,
+                  startedAt: Date.now(),
+                },
+              ],
+            }
+            updateReply(sessionId, reply)
+            persist(sessionId)
+
+            let text = ''
+            let ok = false
+            let profile: Sts2Profile | undefined
             if (call.name === 'sts2_query') {
               const command =
                 typeof input.command === 'string' ? input.command.trim() : ''
@@ -1330,31 +1386,59 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               if (input.asc === true) {
                 args.push('--asc')
               }
-              let text = ''
-              let ok = false
               try {
                 const result = await querySts2(command, args, controller.signal)
                 text = result.text
                 ok = result.ok
+                if (command === 'player-profile') {
+                  profile = result.data
+                  if (profile) {
+                    text +=
+                      '\n\n（完整战绩已在界面内嵌块展示。回答请用 3-5 句话总结亮点和短板，不要逐行重复表格。）'
+                  }
+                }
               } catch (error) {
                 text = `杀戮尖塔数据查询失败：${
                   error instanceof Error ? error.message : String(error)
                 }`
               }
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: call.id,
-                content: text || '没有返回数据。',
-                is_error: !ok,
-              })
-              continue
+            } else {
+              text = `未知工具：${call.name}`
+            }
+
+            const output = text || (ok ? '没有返回数据。' : '工具调用失败。')
+            reply = {
+              ...reply,
+              blocks: reply.blocks.map((block) =>
+                block.type === 'client_tool' && block.id === toolBlockId
+                  ? { ...block, output, isError: !ok, endedAt: Date.now() }
+                  : block
+              ),
+            }
+            updateReply(sessionId, reply)
+            persist(sessionId)
+
+            if (profile) {
+              reply = {
+                ...reply,
+                blocks: [
+                  ...reply.blocks,
+                  {
+                    type: 'sts2_profile',
+                    id: `profile_${call.id}`,
+                    profile,
+                  },
+                ],
+              }
+              updateReply(sessionId, reply)
+              persist(sessionId)
             }
 
             toolResults.push({
               type: 'tool_result',
               tool_use_id: call.id,
-              content: `未知工具：${call.name}`,
-              is_error: true,
+              content: output,
+              is_error: !ok,
             })
           }
 
