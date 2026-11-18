@@ -8,6 +8,7 @@ import { newChat, removeSession, useChatStore } from '../../services/chat/store.
 import type { SessionSummary } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
+import { BrandLogo } from './BrandLogo.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
@@ -52,7 +53,9 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   return (
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
       <div className={styles.top}>
-        <div className={styles.appName}>{t('appName')}</div>
+        <div className={styles.logo} role="img" aria-label={t('appName')}>
+          <BrandLogo />
+        </div>
         <IconButton
           size="m"
           icon={<IconPanelLeftOutline16 />}
