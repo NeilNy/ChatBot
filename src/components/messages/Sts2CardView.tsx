@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import clsx from 'clsx'
 import { IconSpadeOutline14 } from '../base/icons.js'
 import type {
   Sts2CardLevel,
@@ -64,6 +65,10 @@ const COPY = {
     winRateOf: '胜率 {p}%',
     maxAOf: '最高 A{a}',
     more: '展开全部 {n} 条',
+    brief: '简介',
+    standard: '标准',
+    detail: '详细',
+    level: '卡片层级',
     noData: '没有可展示的数据',
   },
   en: {
@@ -115,6 +120,10 @@ const COPY = {
     winRateOf: 'Win {p}%',
     maxAOf: 'Max A{a}',
     more: 'Show all {n}',
+    brief: 'Brief',
+    standard: 'Standard',
+    detail: 'Detailed',
+    level: 'Card detail level',
     noData: 'No data to display',
   },
 }
@@ -182,18 +191,23 @@ const Shell = ({
   title,
   subtitle,
   badge,
+  control,
   children,
 }: {
   title: string
   subtitle?: string
   badge?: string
+  control?: ReactNode
   children: ReactNode
 }) => (
   <section className={styles.card}>
     <header className={styles.header}>
-      <div className={styles.brand}>
-        <IconSpadeOutline14 />
-        SKADA
+      <div className={styles.topRow}>
+        <div className={styles.brand}>
+          <IconSpadeOutline14 />
+          SKADA
+        </div>
+        {control}
       </div>
       <div className={styles.titleRow}>
         <h3 className={styles.title}>{title}</h3>
@@ -212,6 +226,37 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
+const Segmented = ({
+  value,
+  onChange,
+}: {
+  value: Sts2CardLevel
+  onChange: (value: Sts2CardLevel) => void
+}) => {
+  const c = useCopy()
+  return (
+    <div className={styles.segmented} role="group" aria-label={c.level}>
+      {(
+        [
+          [1, c.brief],
+          [2, c.standard],
+          [3, c.detail],
+        ] as const
+      ).map(([level, label]) => (
+        <button
+          key={level}
+          type="button"
+          aria-pressed={value === level}
+          className={clsx(styles.segment, value === level && styles.segmentActive)}
+          onClick={() => onChange(level)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const RecordItem = ({ label, value }: { label: string; value: string }) => (
   <div className={styles.record}>
     <span>{label}</span>
@@ -223,10 +268,12 @@ const ProfileCard = ({
   value,
   locale,
   level,
+  control,
 }: {
   value: Sts2Profile
   locale: string
   level: Sts2CardLevel
+  control: ReactNode
 }) => {
   const c = useCopy()
   const s = value.summary ?? {}
@@ -242,6 +289,7 @@ const ProfileCard = ({
       title={value.player_name ?? c.profile}
       subtitle={fill(c.runs, { n: s.total_runs ?? 0 })}
       badge={fill(c.ascension, { a: s.max_ascension_victory ?? 0 })}
+      control={control}
     >
       <div className={styles.hero}>
         <div>
@@ -339,11 +387,13 @@ const RankingCard = ({
   data,
   locale,
   level,
+  control,
 }: {
   template: 'cards' | 'relics'
   data: Sts2CardsData | Sts2RelicsData
   locale: string
   level: Sts2CardLevel
+  control: ReactNode
 }) => {
   const c = useCopy()
   const cards = (data as Sts2CardsData).cards ?? []
@@ -358,6 +408,7 @@ const RankingCard = ({
     <Shell
       title={template === 'cards' ? c.cards : c.relics}
       subtitle={subtitle !== '—' ? subtitle : undefined}
+      control={control}
     >
       <div className={styles.table}>
         <div className={`${styles.tableRow} ${styles.tableHeader}`}>
@@ -427,10 +478,12 @@ const RunCard = ({
   data,
   locale,
   level,
+  control,
 }: {
   data: Sts2RunData
   locale: string
   level: Sts2CardLevel
+  control: ReactNode
 }) => {
   const c = useCopy()
   const run = data.run
@@ -446,6 +499,7 @@ const RunCard = ({
         .filter(Boolean)
         .join(' · ')}
       badge={run.is_victory ? c.victory : run.abandoned ? c.abandoned : c.defeat}
+      control={control}
     >
       <div className={styles.statGrid}>
         <Stat label={c.floorLabel} value={fill(c.floor, { n: run.floor_reached ?? 0 })} />
@@ -484,16 +538,22 @@ const OverviewCard = ({
   data,
   locale,
   level,
+  control,
 }: {
   data: Sts2OverviewData
   locale: string
   level: Sts2CardLevel
+  control: ReactNode
 }) => {
   const c = useCopy()
   const characters = data.character_win_rates ?? []
   const visible = level === 1 ? characters.slice(0, 3) : characters
   return (
-    <Shell title={c.overview} subtitle={data.unique_players ? `${data.unique_players.toLocaleString()} ${c.totalRuns}` : undefined}>
+    <Shell
+      title={c.overview}
+      subtitle={data.unique_players ? `${data.unique_players.toLocaleString()} ${c.totalRuns}` : undefined}
+      control={control}
+    >
       <div className={styles.statGrid}>
         <Stat label={c.totalRuns} value={(data.total_runs ?? 0).toLocaleString()} />
         <Stat label={c.winRate} value={pct(data.win_rate)} />
@@ -526,7 +586,7 @@ const OverviewCard = ({
 
 export const Sts2CardView = ({
   template,
-  level,
+  level: initialLevel,
   data,
 }: {
   template: Sts2CardTemplate
@@ -534,9 +594,24 @@ export const Sts2CardView = ({
   data: unknown
 }) => {
   const locale = useSettings((state) => state.locale)
+  const [level, setLevel] = useState<Sts2CardLevel>(initialLevel)
+
+  useEffect(() => {
+    setLevel(initialLevel)
+  }, [initialLevel])
+
+  const control = <Segmented value={level} onChange={setLevel} />
+
   switch (template) {
     case 'profile':
-      return <ProfileCard value={data as Sts2Profile} locale={locale} level={level} />
+      return (
+        <ProfileCard
+          value={data as Sts2Profile}
+          locale={locale}
+          level={level}
+          control={control}
+        />
+      )
     case 'cards':
     case 'relics':
       return (
@@ -545,12 +620,20 @@ export const Sts2CardView = ({
           data={data as Sts2CardsData | Sts2RelicsData}
           locale={locale}
           level={level}
+          control={control}
         />
       )
     case 'run':
-      return <RunCard data={data as Sts2RunData} locale={locale} level={level} />
+      return <RunCard data={data as Sts2RunData} locale={locale} level={level} control={control} />
     case 'overview':
-      return <OverviewCard data={data as Sts2OverviewData} locale={locale} level={level} />
+      return (
+        <OverviewCard
+          data={data as Sts2OverviewData}
+          locale={locale}
+          level={level}
+          control={control}
+        />
+      )
     default:
       return null
   }

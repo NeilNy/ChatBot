@@ -9,7 +9,7 @@
   --accent-soft: rgb(169 130 74 / 10%);
   --green: #1f7a3a;
   --red: #c9271f;
-  width: min(100%, 520px);
+  width: min(100%, 480px);
   margin: 10px 0 12px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -17,6 +17,7 @@
   background: var(--bg);
   box-shadow: 0 6px 22px rgb(0 0 0 / 6%);
   color: var(--text);
+  line-height: 1.35;
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
@@ -41,7 +42,50 @@
 }
 
 .header {
-  padding: 12px 14px 8px;
+  padding: 10px 12px 6px;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.segmented {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.segment {
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segmentActive {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
 }
 
 .brand {
@@ -83,26 +127,26 @@
 }
 
 .subtitle {
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .body {
-  padding: 0 14px 14px;
+  padding: 0 12px 12px;
 }
 
 .hero {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px 20px;
-  padding-top: 2px;
+  gap: 5px 14px;
+  padding-top: 1px;
 }
 
 .winRate {
   color: var(--text);
-  font-size: 31px;
+  font-size: 28px;
   font-weight: 300;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -110,9 +154,9 @@
 }
 
 .heroLabel {
-  margin-top: 5px;
+  margin-top: 3px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -121,15 +165,15 @@
 .heroStat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-bottom: 3px;
+  gap: 1px;
+  padding-bottom: 1px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .heroStat strong {
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -137,22 +181,22 @@
 .statGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 7px 9px;
-  border-radius: 9px;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 8px;
   background: var(--bg-soft);
 }
 
 .statValue {
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
@@ -166,21 +210,21 @@
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .chip {
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--bg-soft);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
 }
 
 .sectionTitle {
-  margin: 12px 0 5px;
+  margin: 9px 0 4px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -191,15 +235,15 @@
 .records {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 4px;
 }
 
 .record {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 7px 9px;
-  border-radius: 9px;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 8px;
   background: var(--bg-soft);
   color: var(--muted);
   font-size: 10px;
@@ -207,7 +251,7 @@
 
 .record strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -215,12 +259,12 @@
 .characters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
 }
 
 .character {
-  padding: 7px 9px;
-  border-radius: 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
   background: var(--bg-soft);
 }
 
@@ -230,13 +274,13 @@
   justify-content: space-between;
   gap: 10px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
 }
 
 .barTrack {
-  height: 5px;
-  margin: 7px 0 5px;
+  height: 4px;
+  margin: 5px 0 3px;
   overflow: hidden;
   border-radius: 999px;
   background: rgb(127 127 127 / 18%);
@@ -255,7 +299,7 @@
   justify-content: space-between;
   gap: 4px 12px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9.5px;
 }
 
 .muted {
@@ -263,14 +307,14 @@
 }
 
 .details {
-  margin-top: 10px;
-  padding-top: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid var(--line);
 }
 
 .details summary {
   color: var(--accent);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -286,11 +330,11 @@
   display: grid;
   grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 4px 8px;
-  padding: 6px 2px;
+  gap: 2px 6px;
+  padding: 4px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .run:last-child {
@@ -321,11 +365,11 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1.5fr) minmax(0, 0.7fr) 50px 46px 46px 50px;
   align-items: center;
-  gap: 4px 8px;
-  padding: 6px 2px;
+  gap: 2px 6px;
+  padding: 4px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -340,7 +384,7 @@
 .tableHeader {
   padding-top: 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -377,8 +421,8 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 58px 58px 42px;
   align-items: center;
-  gap: 4px 8px;
-  padding: 5px 2px;
+  gap: 2px 6px;
+  padding: 3px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
