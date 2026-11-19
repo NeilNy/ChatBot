@@ -6,8 +6,7 @@ import type {
   WebSearchResult,
   WebSearchToolResultBlock,
 } from '../api/types.js'
-import type { Sts2CardLevel, Sts2CardTemplate } from '../api/sts2.js'
-import type { AssistantMessage, ThinkingPart } from './types.js'
+import type { AssistantMessage, Sts2CardPart, ThinkingPart } from './types.js'
 
 /**
  * 由回复的内容块推导界面需要的结构：思考与工具步骤的时间线、带引用角标的正文、可引用的来源列表。
@@ -95,7 +94,7 @@ export type ReplyView = {
   /** 搜索到的网页（去重），用于底部汇总与搜索结果列表 */
   searchResults: Source[]
   /** 固定杀戮尖塔卡片，放在正文之后展示 */
-  cards: { key: string; template: Sts2CardTemplate; level: Sts2CardLevel; data: unknown }[]
+  cards: Sts2CardPart[]
 }
 
 export const getSiteName = (url: string) => {
@@ -203,7 +202,7 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
 
   const registry = new SourceRegistry()
   const searchResults: Source[] = []
-  const cards: { key: string; template: Sts2CardTemplate; level: Sts2CardLevel; data: unknown }[] = []
+  const cards: Sts2CardPart[] = []
   const steps: Step[] = []
   const mergedSearch = new Map<ServerToolKind, SearchStep>()
   let mergedThinking: ThinkingStep | null = null
@@ -268,7 +267,7 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
       return
     }
     if (block.type === 'sts2_card') {
-      cards.push({ key: `card-${block.id}`, template: block.template, level: block.level, data: block.data })
+      cards.push(block)
       return
     }
     if (block.type === 'client_tool') {
@@ -388,7 +387,10 @@ export const buildReplyView = (reply: AssistantMessage, streaming: boolean): Rep
     answer: answer
       ? {
           markdown: answer.markdown,
-          text: answer.text.replace(/```html-embed[\s\S]*?```/g, '').trim(),
+          text: answer.text
+            .replace(/```html-embed[\s\S]*?```/g, '')
+            .replace(/\[\[sts2-card:[^\]]+\]\]/g, '')
+            .trim(),
         }
       : null,
     sources: registry.list,

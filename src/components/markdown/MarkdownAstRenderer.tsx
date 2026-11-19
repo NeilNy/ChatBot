@@ -1,5 +1,6 @@
 import { createElement, memo, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
 import clsx from 'clsx'
+import type { Sts2CardPart } from '../../services/chat/types.js'
 import type {
   BlockContent,
   DefinitionContent,
@@ -11,6 +12,8 @@ import type {
 import { CitationLink } from '../search/CitationLink.js'
 import { CodeBlock } from './CodeBlock.js'
 import { HtmlEmbed } from './HtmlEmbed.js'
+import { Sts2CardProvider } from '../messages/Sts2CardContext.js'
+import { Sts2CardSlot } from '../messages/Sts2CardSlot.js'
 import { ImageAsLink, Link } from './Link.js'
 import { InlineMath, MathBlock } from './MathFormula.js'
 
@@ -196,6 +199,9 @@ const MarkdownBlockContentOrDefinitionContent = memo(
           if (node.lang === 'html-embed') {
             return <HtmlEmbed key={index} html={node.value} loading={loading} />
           }
+          if (node.lang === 'sts2-card') {
+            return <Sts2CardSlot key={index} id={node.value.trim()} />
+          }
           return (
             <CodeBlock
               key={index}
@@ -221,10 +227,12 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
   onUpdate,
   className,
   loading = false,
+  cards = [],
 }: {
   ast: Root
   className?: string
   loading?: boolean
+  cards?: readonly Sts2CardPart[]
   /**
    * layoutEffect 之后触发 -> 进行页面滚动
    */
@@ -238,14 +246,16 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
 
   return useMemo(
     () => (
-      <div className={clsx('ds-markdown', className)}>
-        {/* 解析器在根节点下产出块级内容。 */}
-        <MarkdownBlockContentOrDefinitionContent
-          nodes={ast.children as Array<BlockContent | DefinitionContent>}
-          loading={loading}
-        />
-      </div>
+      <Sts2CardProvider cards={cards}>
+        <div className={clsx('ds-markdown', className)}>
+          {/* 解析器在根节点下产出块级内容。 */}
+          <MarkdownBlockContentOrDefinitionContent
+            nodes={ast.children as Array<BlockContent | DefinitionContent>}
+            loading={loading}
+          />
+        </div>
+      </Sts2CardProvider>
     ),
-    [className, ast.children, loading]
+    [className, ast.children, loading, cards]
   )
 })

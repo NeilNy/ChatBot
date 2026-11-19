@@ -12,7 +12,6 @@ import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
-import { Sts2CardView } from './Sts2CardView.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
 import { ReadAloudButton } from './ReadAloudButton.js'
 import { CopyButton } from './CopyButton.js'
@@ -75,11 +74,9 @@ export const AssistantMessage = memo(function AssistantMessage({
           cacheKey={message.id}
           disableLink={false}
           sources={view.sources}
+          cards={view.cards}
         />
       ) : null}
-      {view.cards.map((card) => (
-        <Sts2CardView key={card.key} template={card.template} level={card.level} data={card.data} />
-      ))}
       {waiting ? (
         <div className={styles.waiting}>
           {[0, 1, 2].map((index) => (

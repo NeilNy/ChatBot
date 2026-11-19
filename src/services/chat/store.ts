@@ -1399,7 +1399,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             let text = ''
             let ok = false
             let card:
-              | { template: Sts2CardTemplate; level: Sts2CardLevel; data: unknown }
+              | { id: string; template: Sts2CardTemplate; level: Sts2CardLevel; data: unknown }
               | undefined
             if (call.name === 'sts2_query') {
               const command = typeof input.command === 'string' ? input.command.trim() : ''
@@ -1447,11 +1447,26 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                     requested === 1 || requested === 2 || requested === 3
                       ? requested
                       : inferCardLevel(questionText)
+                  const cardId = `sts2-${call.id}`
+                  const data = result.data as Record<string, unknown>
+                  const run = data.run as { run_id?: number } | undefined
+                  const title =
+                    template === 'profile'
+                      ? String(data.player_name ?? '玩家档案')
+                      : template === 'cards'
+                        ? '卡牌排行'
+                        : template === 'relics'
+                          ? '遗物排行'
+                          : template === 'run'
+                            ? `对局 #${run?.run_id ?? '—'}`
+                            : '环境总览'
                   card = {
+                    id: cardId,
                     template: template as Sts2CardTemplate,
                     level,
                     data: result.data,
                   }
+                  const cardField = JSON.stringify({ id: cardId, template, level, title })
                   if (command === 'run') {
                     const runData = result.data as {
                       run?: {
@@ -1477,15 +1492,15 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                           run.death_cause
                             ? `死因：${run.death_cause_name?.zh ?? run.death_cause}`
                             : '',
-                          `战斗记录 ${Array.isArray(runData.combats) ? runData.combats.length : 0} 场（完整列表见界面固定卡片）。`,
-                          '界面已展示对局卡片。回答用 2-3 句话总结，不要逐条重复战斗表。',
+                          `战斗记录 ${Array.isArray(runData.combats) ? runData.combats.length : 0} 场（完整列表见卡片字段）。`,
                         ]
                           .filter(Boolean)
                           .join('\n')
                       : text.slice(0, 6000)
-                  } else {
-                    text += '\n\n（界面已展示固定卡片，回答用 2-3 句总结即可，不要重复表格。）'
                   }
+                  text +=
+                    `\n\n[card] ${cardField}\n` +
+                    `如果需要在回答中展示这张卡片，请在正文最后单独输出 [[sts2-card:${cardId}]]；不需要展示就不要输出，也不要生成 HTML 或重复表格。`
                 }
               } catch (error) {
                 text = `杀戮尖塔数据查询失败：${
@@ -1515,7 +1530,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                   ...reply.blocks,
                   {
                     type: 'sts2_card',
-                    id: `card_${call.id}`,
+                    id: card.id,
                     template: card.template,
                     level: card.level,
                     data: card.data,
