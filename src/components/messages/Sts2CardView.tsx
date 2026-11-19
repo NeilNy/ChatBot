@@ -63,6 +63,7 @@ const COPY = {
     runs: '{n} 局',
     winRateOf: '胜率 {p}%',
     maxAOf: '最高 A{a}',
+    more: '展开全部 {n} 条',
     noData: '没有可展示的数据',
   },
   en: {
@@ -113,6 +114,7 @@ const COPY = {
     runs: '{n} runs',
     winRateOf: 'Win {p}%',
     maxAOf: 'Max A{a}',
+    more: 'Show all {n}',
     noData: 'No data to display',
   },
 }
@@ -367,12 +369,12 @@ const RankingCard = ({
           <span>{c.wrSkip}</span>
           <span>{c.delta}</span>
         </div>
-        {rows.slice(0, limit).map((row, index) => {
+        {rows.slice(0, Math.min(limit, 10)).map((row, index) => {
           const card = row as Sts2CardRow
           const relic = row as Sts2RelicRow
           const delta = card.win_rate_delta
           return (
-            <div key={`${row.rank ?? index}`} className={styles.tableRow}>
+            <div key={`${row.rank ?? index}-${index}`} className={styles.tableRow}>
               <span className={styles.rank}>{row.rank ?? index + 1}</span>
               <span className={styles.tableName}>{nameOf(row, locale)}</span>
               <span className={styles.muted}>
@@ -389,6 +391,33 @@ const RankingCard = ({
             </div>
           )
         })}
+        {limit > 10 && rows.length > 10 ? (
+          <details className={styles.details}>
+            <summary>{fill(c.more, { n: Math.min(rows.length, limit) })}</summary>
+            {rows.slice(10, limit).map((row, index) => {
+              const card = row as Sts2CardRow
+              const relic = row as Sts2RelicRow
+              const delta = card.win_rate_delta
+              return (
+                <div key={`${row.rank ?? index + 10}-${index}`} className={styles.tableRow}>
+                  <span className={styles.rank}>{row.rank ?? index + 11}</span>
+                  <span className={styles.tableName}>{nameOf(row, locale)}</span>
+                  <span className={styles.muted}>
+                    {template === 'cards'
+                      ? card.character_name?.zh ?? card.character ?? '—'
+                      : relic.rarity ?? '—'}
+                  </span>
+                  <span>{template === 'cards' ? (card.skada_score ?? 0).toFixed(1) : pct(relic.hold_rate)}</span>
+                  <span>{pct(row.win_rate_picked)}</span>
+                  <span>{pct(row.win_rate_skipped)}</span>
+                  <span className={delta !== undefined && delta < 0 ? styles.defeat : styles.victory}>
+                    {delta !== undefined ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%` : '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </details>
+        ) : null}
       </div>
     </Shell>
   )
@@ -430,8 +459,8 @@ const RunCard = ({
         </div>
       ) : null}
       {combatsToShow > 0 ? (
-        <>
-          <div className={styles.sectionTitle}>{c.combats}</div>
+        <details className={styles.details}>
+          <summary>{c.combats} · {Math.min(combatsToShow, combats.length)}</summary>
           <div className={styles.combats}>
             {combats.slice(0, combatsToShow).map((combat, index) => (
               <div key={index} className={styles.combat}>
@@ -445,7 +474,7 @@ const RunCard = ({
               </div>
             ))}
           </div>
-        </>
+        </details>
       ) : null}
     </Shell>
   )

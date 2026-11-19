@@ -9,14 +9,13 @@
   --accent-soft: rgb(169 130 74 / 10%);
   --green: #1f7a3a;
   --red: #c9271f;
-  --shadow: 0 10px 34px rgb(0 0 0 / 8%);
-  width: 100%;
-  margin: 12px 0 16px;
+  width: min(100%, 520px);
+  margin: 10px 0 12px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--bg);
-  box-shadow: var(--shadow);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 6%);
   color: var(--text);
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
@@ -39,11 +38,10 @@
   --accent-soft: rgb(212 180 131 / 14%);
   --green: #30d158;
   --red: #ff453a;
-  --shadow: 0 10px 34px rgb(0 0 0 / 42%);
 }
 
 .header {
-  padding: 20px 22px 16px;
+  padding: 12px 14px 8px;
 }
 
 .brand {
@@ -67,7 +65,7 @@
 .title {
   margin: 0;
   color: var(--text);
-  font-size: 26px;
+  font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -75,36 +73,36 @@
 
 .badge {
   flex-shrink: 0;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .subtitle {
-  margin-top: 5px;
+  margin-top: 3px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .body {
-  padding: 0 22px 22px;
+  padding: 0 14px 14px;
 }
 
 .hero {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px 28px;
+  gap: 8px 20px;
   padding-top: 2px;
 }
 
 .winRate {
   color: var(--text);
-  font-size: 46px;
+  font-size: 31px;
   font-weight: 300;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -131,7 +129,7 @@
 
 .heroStat strong {
   color: var(--text);
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -139,22 +137,22 @@
 .statGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 18px;
+  gap: 5px;
+  margin-top: 8px;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 13px;
-  border-radius: 14px;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 9px;
   background: var(--bg-soft);
 }
 
 .statValue {
   color: var(--text);
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
@@ -168,21 +166,21 @@
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 5px;
+  margin-top: 8px;
 }
 
 .chip {
-  padding: 5px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--bg-soft);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
 .sectionTitle {
-  margin: 20px 0 8px;
+  margin: 12px 0 5px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -199,30 +197,30 @@
 .record {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 11px 13px;
-  border-radius: 14px;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 9px;
   background: var(--bg-soft);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .record strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .characters {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .character {
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 7px 9px;
+  border-radius: 9px;
   background: var(--bg-soft);
 }
 
@@ -232,13 +230,13 @@
   justify-content: space-between;
   gap: 10px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .barTrack {
-  height: 6px;
-  margin: 9px 0 6px;
+  height: 5px;
+  margin: 7px 0 5px;
   overflow: hidden;
   border-radius: 999px;
   background: rgb(127 127 127 / 18%);
@@ -257,7 +255,7 @@
   justify-content: space-between;
   gap: 4px 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .muted {
@@ -265,14 +263,14 @@
 }
 
 .details {
-  margin-top: 16px;
-  padding-top: 12px;
+  margin-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
 }
 
 .details summary {
   color: var(--accent);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -288,11 +286,11 @@
   display: grid;
   grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 4px 10px;
-  padding: 9px 2px;
+  gap: 4px 8px;
+  padding: 6px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .run:last-child {
@@ -321,13 +319,13 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1.8fr) minmax(0, 1fr) 72px 62px 62px 62px;
+  grid-template-columns: 30px minmax(0, 1.5fr) minmax(0, 0.7fr) 50px 46px 46px 50px;
   align-items: center;
-  gap: 4px 10px;
-  padding: 9px 4px;
+  gap: 4px 8px;
+  padding: 6px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -342,7 +340,7 @@
 .tableHeader {
   padding-top: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -363,8 +361,8 @@
 
 .death {
   margin-top: 12px;
-  padding: 10px 13px;
-  border-radius: 12px;
+  padding: 7px 9px;
+  border-radius: 9px;
   background: rgb(201 39 31 / 8%);
   color: var(--red);
   font-size: 12px;
@@ -377,10 +375,10 @@
 
 .combat {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 86px 86px 54px;
+  grid-template-columns: 30px minmax(0, 1fr) 58px 58px 42px;
   align-items: center;
-  gap: 4px 10px;
-  padding: 8px 4px;
+  gap: 4px 8px;
+  padding: 5px 2px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
@@ -395,18 +393,22 @@
 }
 
 @media not all and (min-width: 680px) {
+  .card {
+    width: 100%;
+  }
+
   .header,
   .body {
-    padding-right: 16px;
-    padding-left: 16px;
+    padding-right: 14px;
+    padding-left: 14px;
   }
 
   .title {
-    font-size: 22px;
+    font-size: 19px;
   }
 
   .winRate {
-    font-size: 38px;
+    font-size: 30px;
   }
 
   .statGrid,
