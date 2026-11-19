@@ -92,6 +92,10 @@ export type Sts2CardRow = {
   win_rate_skipped?: number
   win_rate_delta?: number
   rarity?: string
+  seen?: number
+  deck_win_rate?: number
+  deck_runs?: number
+  confidence?: string
 }
 
 export type Sts2CardsData = {
@@ -109,6 +113,9 @@ export type Sts2RelicRow = {
   pick_rate?: number
   win_rate_picked?: number
   win_rate_skipped?: number
+  win_rate_owned?: number
+  times_offered?: number
+  seen?: number
   rarity?: string
 }
 
@@ -132,6 +139,7 @@ export type Sts2Combat = {
 export type Sts2RunData = {
   run?: Sts2Run & { player_name?: string; seed?: string; player_count?: number }
   combats?: Sts2Combat[]
+  final_relics?: { relic_id?: string; display_name?: { en?: string; zh?: string } }[]
 }
 
 export type Sts2OverviewData = {
@@ -149,6 +157,22 @@ export type Sts2OverviewData = {
     win_rate?: number
     display_name?: { en?: string; zh?: string }
     character_name?: { en?: string; zh?: string }
+  }[]
+  by_ascension?: { ascension?: number; wins?: number; total?: number; win_rate?: number }[]
+  death_cause_top10?: {
+    death_cause?: string
+    count?: number
+    display_name?: { en?: string; zh?: string }
+    death_cause_name?: { en?: string; zh?: string }
+  }[]
+  most_damaging_encounters?: {
+    encounter?: string
+    enc_type?: string
+    avg_damage_taken?: number
+    avg_turns?: number
+    times_seen?: number
+    display_name?: { en?: string; zh?: string }
+    encounter_name?: { en?: string; zh?: string }
   }[]
 }
 

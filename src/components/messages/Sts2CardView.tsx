@@ -24,6 +24,7 @@ const COPY = {
     overview: '环境总览',
     winRate: '胜率',
     totalRuns: '总对局',
+    players: '玩家',
     wins: '胜利',
     losses: '失败',
     maxA: '最高 A',
@@ -65,6 +66,23 @@ const COPY = {
     winRateOf: '胜率 {p}%',
     maxAOf: '最高 A{a}',
     more: '展开全部 {n} 条',
+    me: '本人',
+    community: '社区对比',
+    communityShort: '社区',
+    growth: '月度成长',
+    moreData: '补充数据',
+    sample: '样本',
+    deckWin: '卡组胜率',
+    confidence: '置信度',
+    offered: '报价',
+    ownedWin: '拿后胜率',
+    finalRelics: '最终遗物',
+    deathCauses: '常见死因',
+    damaging: '高伤害遭遇',
+    avgDamage: '平均伤害',
+    timesSeen: '出现',
+    avgBlock: '平均格挡',
+    energy: '能量效率',
     brief: '简介',
     standard: '标准',
     detail: '详细',
@@ -79,6 +97,7 @@ const COPY = {
     overview: 'Meta Overview',
     winRate: 'Win rate',
     totalRuns: 'Runs',
+    players: 'players',
     wins: 'Wins',
     losses: 'Losses',
     maxA: 'Max A',
@@ -120,6 +139,23 @@ const COPY = {
     winRateOf: 'Win {p}%',
     maxAOf: 'Max A{a}',
     more: 'Show all {n}',
+    me: 'You',
+    community: 'Community',
+    communityShort: 'Community',
+    growth: 'Monthly growth',
+    moreData: 'More data',
+    sample: 'Sample',
+    deckWin: 'Deck WR',
+    confidence: 'Confidence',
+    offered: 'Offered',
+    ownedWin: 'WR owned',
+    finalRelics: 'Final relics',
+    deathCauses: 'Common deaths',
+    damaging: 'Hardest encounters',
+    avgDamage: 'Avg damage',
+    timesSeen: 'Seen',
+    avgBlock: 'Avg block',
+    energy: 'Energy',
     brief: 'Brief',
     standard: 'Standard',
     detail: 'Detailed',
@@ -283,7 +319,7 @@ const ProfileCard = ({
   const runs = value.recent_runs ?? []
   const top = (v: number | undefined) =>
     typeof v === 'number' ? fill(c.top, { p: Math.max(0, 100 - v).toFixed(0) }) : '—'
-  const runsToShow = level === 3 ? 20 : 8
+  const runsToShow = level === 3 ? 20 : level === 2 ? 5 : 0
   return (
     <Shell
       title={value.player_name ?? c.profile}
@@ -359,6 +395,48 @@ const ProfileCard = ({
             ))}
           </div>
 
+          {level === 3 && value.radar ? (
+            <>
+              <div className={styles.sectionTitle}>{c.community}</div>
+              <div className={styles.compare}>
+                <div className={`${styles.compareRow} ${styles.compareHeader}`}>
+                  <span />
+                  <span>{c.me}</span>
+                  <span>{c.communityShort}</span>
+                </div>
+                {[
+                  [c.winRate, pct(value.radar.player?.win_rate), pct(value.radar.community?.win_rate)],
+                  [c.avgFloor, (value.radar.player?.avg_floor ?? 0).toFixed(1), (value.radar.community?.avg_floor ?? 0).toFixed(1)],
+                  [c.bestDpt, (value.radar.player?.avg_dpt ?? 0).toFixed(1), (value.radar.community?.avg_dpt ?? 0).toFixed(1)],
+                  [c.avgBlock, (value.radar.player?.avg_block ?? 0).toFixed(1), (value.radar.community?.avg_block ?? 0).toFixed(1)],
+                  [c.energy, pct(value.radar.player?.energy_efficiency), pct(value.radar.community?.energy_efficiency)],
+                ].map(([label, player, community]) => (
+                  <div className={styles.compareRow} key={label}>
+                    <span>{label}</span>
+                    <strong>{player}</strong>
+                    <span>{community}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {level === 3 && (value.growth?.length ?? 0) > 0 ? (
+            <>
+              <div className={styles.sectionTitle}>{c.growth}</div>
+              <div className={styles.growthGrid}>
+                {value.growth?.map((item) => (
+                  <div className={styles.growthCell} key={item.month}>
+                    <span>{item.month}</span>
+                    <strong>{pct(item.win_rate)}</strong>
+                    <span className={styles.muted}>{fill(c.runs, { n: item.runs ?? 0 })}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {runsToShow > 0 ? (
           <details className={styles.details}>
             <summary>{c.recentRuns} · {Math.min(runsToShow, runs.length)}</summary>
             <div className={styles.runs}>
@@ -376,6 +454,7 @@ const ProfileCard = ({
               ))}
             </div>
           </details>
+          ) : null}
         </>
       ) : null}
     </Shell>
@@ -470,6 +549,27 @@ const RankingCard = ({
           </details>
         ) : null}
       </div>
+      {level === 3 ? (
+        <>
+          <div className={styles.sectionTitle}>{c.moreData}</div>
+          <div className={styles.detailList}>
+            {rows.slice(0, 5).map((row, index) => {
+              const card = row as Sts2CardRow
+              const relic = row as Sts2RelicRow
+              return (
+                <div className={styles.detailRow} key={`detail-${index}`}>
+                  <span className={styles.tableName}>{nameOf(row, locale)}</span>
+                  <span className={styles.muted}>
+                    {template === 'cards'
+                      ? `${c.sample} ${(card.seen ?? 0).toLocaleString()} · ${c.deckWin} ${pct(card.deck_win_rate)} · ${card.rarity ?? '—'} · ${card.confidence ?? '—'}`
+                      : `${c.offered} ${(relic.times_offered ?? 0).toLocaleString()} · ${c.hold} ${pct(relic.hold_rate)} · ${c.ownedWin} ${pct(relic.win_rate_owned)} · ${relic.rarity ?? '—'}`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      ) : null}
     </Shell>
   )
 }
@@ -512,6 +612,18 @@ const RunCard = ({
           {c.death}: {run.death_cause_name?.zh ?? run.death_cause}
         </div>
       ) : null}
+      {level === 3 && (data.final_relics?.length ?? 0) > 0 ? (
+        <>
+          <div className={styles.sectionTitle}>{c.finalRelics}</div>
+          <div className={styles.relicChips}>
+            {data.final_relics?.map((relic) => (
+              <span className={styles.relicChip} key={relic.relic_id ?? relic.display_name?.zh}>
+                {nameOf(relic, locale)}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : null}
       {combatsToShow > 0 ? (
         <details className={styles.details}>
           <summary>{c.combats} · {Math.min(combatsToShow, combats.length)}</summary>
@@ -551,7 +663,7 @@ const OverviewCard = ({
   return (
     <Shell
       title={c.overview}
-      subtitle={data.unique_players ? `${data.unique_players.toLocaleString()} ${c.totalRuns}` : undefined}
+      subtitle={data.unique_players ? `${data.unique_players.toLocaleString()} ${c.players}` : undefined}
       control={control}
     >
       <div className={styles.statGrid}>
@@ -580,6 +692,35 @@ const OverviewCard = ({
           </div>
         ))}
       </div>
+      {level === 3 && (data.death_cause_top10?.length ?? 0) > 0 ? (
+        <>
+          <div className={styles.sectionTitle}>{c.deathCauses}</div>
+          <div className={styles.miniList}>
+            {data.death_cause_top10?.slice(0, 5).map((item) => (
+              <div className={styles.miniRow} key={item.death_cause ?? item.display_name?.zh}>
+                <span className={styles.tableName}>{nameOf(item, locale)}</span>
+                <strong>{(item.count ?? 0).toLocaleString()}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+      {level === 3 && (data.most_damaging_encounters?.length ?? 0) > 0 ? (
+        <>
+          <div className={styles.sectionTitle}>{c.damaging}</div>
+          <div className={styles.miniList}>
+            {data.most_damaging_encounters?.slice(0, 5).map((item) => (
+              <div className={styles.miniRow} key={item.encounter ?? item.display_name?.zh}>
+                <span className={styles.tableName}>{nameOf(item, locale)}</span>
+                <span className={styles.muted}>
+                  {c.avgDamage} {(item.avg_damage_taken ?? 0).toFixed(1)} · {c.timesSeen}{' '}
+                  {(item.times_seen ?? 0).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
     </Shell>
   )
 }
