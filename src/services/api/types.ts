@@ -189,7 +189,10 @@ export type AssistantBlockParam =
 export type MessageParam =
   /** Chat Engine 扩展角色，位于对应 user 前；需服务端支持 latest_reminder。 */
   | { role: 'latest_reminder'; content: string }
-  | { role: 'user'; content: string | (FileBlockParam | TextBlockParam | ClientToolResultBlockParam)[] }
+  | {
+      role: 'user'
+      content: string | (FileBlockParam | TextBlockParam | ClientToolResultBlockParam)[]
+    }
   | { role: 'assistant'; content: AssistantBlockParam[] }
 
 /** 开启联网搜索与边想边搜 */
@@ -209,6 +212,8 @@ export type CreateMessageRequest = {
   system: string
   messages: MessageParam[]
   thinking: { type: 'enabled' | 'disabled'; budget_tokens?: number }
+  /** 思考开启时由 OpenCode 请求写成 output_config.effort，取值 low、high、max。 */
+  effort?: 'low' | 'high' | 'max'
   tools: (DeepseekWebSearchTool | DeepseekReadUrlTool | ClientTool)[]
   safety_check: { level: 'high' }
   title?: { enabled: boolean }

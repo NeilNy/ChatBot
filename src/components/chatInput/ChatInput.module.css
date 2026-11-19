@@ -236,11 +236,85 @@
 }
 
 .functionRow {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 4px;
   padding: 12px;
+}
+
+/* 紧凑胶囊，贴在附件按钮左侧，长模型名超出后省略 */
+.right .picker {
+  --select-arrow-right: 6px;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 196px;
+  height: 28px;
+  padding: 0 20px 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+
+  &:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  > span:first-child {
+    min-width: 0;
+  }
+}
+
+.right .pickerEffort {
+  flex: 0 0 auto;
+  max-width: none;
+}
+
+@container (max-width: 520px) {
+  .right .picker:not(.pickerEffort) {
+    max-width: 108px;
+  }
+}
+
+@container (max-width: 400px) {
+  .functionRow .toggle {
+    padding: 0 8px;
+  }
+
+  .right .picker:not(.pickerEffort) {
+    max-width: 72px;
+  }
+
+  .functionRow .sendButton {
+    margin-left: 2px;
+  }
+}
+
+/* 窄屏上三个开关和两个小下拉要同时放下，再收一档内边距 */
+@container (max-width: 280px) {
+  .functionRow .toggles {
+    gap: 4px;
+  }
+
+  .functionRow .toggle {
+    padding: 0 6px;
+  }
+
+  .functionRow .right {
+    gap: 2px;
+  }
+
+  .right .picker {
+    padding: 0 16px 0 6px;
+  }
+
+  .right .picker:not(.pickerEffort) {
+    max-width: 52px;
+  }
 }
 
 .toggles {

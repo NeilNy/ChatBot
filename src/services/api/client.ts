@@ -1,6 +1,15 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
 import { readMessageEvent } from './parseEvent.js'
-import { API_BASE_URL, IS_OPENCODE, OPENCODE_ONLY_MODEL, VERIFY_URL, opencodeSessionId } from './provider.js'
+import {
+  API_BASE_URL,
+  DEFAULT_THINKING_EFFORT,
+  IS_OPENCODE,
+  OPENCODE_ONLY_MODEL,
+  VERIFY_URL,
+  isChatModelId,
+  modelRequiresThinking,
+  opencodeSessionId,
+} from './provider.js'
 import { readServerSentEvents } from './sse.js'
 import type {
   ApiErrorBody,
@@ -154,25 +163,29 @@ const hasFile = (body: CreateMessageRequest) =>
  * 请求体按网关能力裁剪：
  * - DeepSeek 原样发送 thinking / tools / safety_check / title 等扩展字段；
  * - OpenCode Go 只接受标准 Anthropic Messages 字段，latest_reminder 角色降级为 user。
+ *   思考强度走 output_config.effort，不再附带固定 budget_tokens。
  */
 const toWireBody = (body: CreateMessageRequest): Record<string, unknown> => {
   if (!IS_OPENCODE) {
-    return { ...body, stream: true }
+    const wire = { ...body, stream: true }
+    delete wire.effort
+    return wire
   }
+  const model = isChatModelId(body.model) ? body.model : OPENCODE_ONLY_MODEL
+  const enabled = body.thinking.type === 'enabled' || modelRequiresThinking(model)
+  const effort =
+    body.effort === 'low' || body.effort === 'high' || body.effort === 'max'
+      ? body.effort
+      : DEFAULT_THINKING_EFFORT
   return {
-    // OpenCode Go 只允许 DeepSeek V4.1 Flash 1017，忽略会话快照或构建参数里的其他模型
-    model: OPENCODE_ONLY_MODEL,
+    model,
     system: body.system,
     messages: body.messages.map((message) =>
-      message.role === 'latest_reminder'
-        ? { role: 'user', content: message.content }
-        : message
+      message.role === 'latest_reminder' ? { role: 'user', content: message.content } : message
     ),
-    // 显式预算让模型更稳定地产生思考块（Anthropic 兼容接口接受该字段）
-    thinking:
-      body.thinking.type === 'enabled'
-        ? { type: 'enabled', budget_tokens: 4096 }
-        : body.thinking,
+    ...(enabled
+      ? { thinking: { type: 'enabled' }, output_config: { effort } }
+      : { thinking: { type: 'disabled' } }),
     ...(body.tools.length > 0 ? { tools: body.tools } : {}),
     stream: true,
   }

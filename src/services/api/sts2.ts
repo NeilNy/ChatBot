@@ -77,6 +77,7 @@ export type Sts2Profile = {
 }
 
 export type Sts2CardTemplate = 'profile' | 'cards' | 'relics' | 'run' | 'overview'
+export type Sts2CardLevel = 1 | 2 | 3
 
 export type Sts2CardRow = {
   rank?: number

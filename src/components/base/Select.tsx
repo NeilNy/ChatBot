@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAnchoredPosition, useDismiss } from './anchored.js'
+import { useAnchoredPosition, useDismiss, type Align } from './anchored.js'
 import { IconCheckOutline16, IconChevronDownOutline14 } from './icons.js'
 import styles from './Select.module.css'
 
@@ -18,6 +18,7 @@ export const Select = <T extends string>({
   placeholder,
   ariaLabel,
   className,
+  align = 'end',
   disabled = false,
 }: {
   value: T
@@ -26,15 +27,17 @@ export const Select = <T extends string>({
   placeholder?: string
   ariaLabel?: string
   className?: string
+  /** 菜单相对触发器的水平对齐。设置项靠右用 end，输入框左侧用 start。 */
+  align?: Align
   disabled?: boolean
 }) => {
   const [open, setOpen] = useState(false)
   const current = options.find((option) => option.value === value)
-  // 菜单贴右侧展开，最多 320px 高，超出在菜单内滚动
+  // 菜单最多 320px 高，超出在菜单内滚动
   const { anchorRef, floatingRef, position } = useAnchoredPosition<
     HTMLButtonElement,
     HTMLDivElement
-  >(open, { align: 'end', maxHeight: 320, minSpace: 160 })
+  >(open, { align, maxHeight: 320, minSpace: 160 })
   // Esc 只关菜单，不让外层弹窗一起关闭
   useDismiss(open, [anchorRef, floatingRef], () => setOpen(false), { captureEscape: true })
 

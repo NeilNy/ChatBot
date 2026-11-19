@@ -1,6 +1,7 @@
 import type { TranslationMessage } from '../../i18n/index.js'
 import type { ApiErrorKind } from '../api/client.js'
-import type { Sts2CardTemplate } from '../api/sts2.js'
+import type { ThinkingEffort } from '../api/provider.js'
+import type { Sts2CardLevel, Sts2CardTemplate } from '../api/sts2.js'
 import type {
   ChatModel,
   MessageUsage,
@@ -83,15 +84,11 @@ export type Sts2CardPart = {
   type: 'sts2_card'
   id: string
   template: Sts2CardTemplate
+  level: Sts2CardLevel
   data: unknown
 }
 
-export type ReplyBlock =
-  | ThinkingPart
-  | TextPart
-  | ServerToolBlock
-  | ClientToolPart
-  | Sts2CardPart
+export type ReplyBlock = ThinkingPart | TextPart | ServerToolBlock | ClientToolPart | Sts2CardPart
 
 /**
  * pending：已发出请求，还没收到事件；streaming：正在接收；
@@ -107,6 +104,8 @@ export type AssistantMessage = MessageBranch & {
   model: ChatModel | null
   /** 请求时是否开启深度思考 */
   thinking?: boolean
+  /** 请求时的思考强度。旧消息没有该字段时，续写使用当前设置。 */
+  thinkingEffort?: ThinkingEffort
   /** 请求时是否声明搜索工具；关闭时 DeepSeek 仍声明 deepseek_read_url */
   search?: boolean
   /** 请求时是否启用杀戮尖塔 2 数据工具 */

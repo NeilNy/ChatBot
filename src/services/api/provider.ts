@@ -19,13 +19,37 @@ export const VERIFY_URL = `${API_PROVIDER.origin}${API_PROVIDER.verifyPath}`
 /** 默认聊天模型 */
 export const DEFAULT_MODEL = API_PROVIDER.model
 
-/**
- * OpenCode Go 部署固定使用的模型：DeepSeek V4.1 Flash 1017。
- * 网关的模型 id 为 deepseek-v4.1-flash，canonical id 为 deepseek/deepseek-v4.1-flash-1017。
- */
-export const OPENCODE_ONLY_MODEL = 'deepseek-v4.1-flash'
+/** DeepSeek 的网关 id。界面显示 canonical 后缀 1017，请求不带这个后缀。 */
+export const DEEPSEEK_MODEL_ID = 'deepseek-v4.1-flash'
+/** 智谱 GLM-5.3。网关 id 与界面名称相同，只接受文字，且不能关闭思考。 */
+export const GLM_MODEL_ID = 'glm-5.3'
 
-/** 实际用于对话的模型：OpenCode 环境锁定，避免历史记录或构建参数切到其他模型 */
+export const CHAT_MODEL_OPTIONS = [
+  { id: DEEPSEEK_MODEL_ID, label: 'deepseek-v4.1-flash-1017' },
+  { id: GLM_MODEL_ID, label: 'glm-5.3' },
+] as const
+
+export type ChatModelId = (typeof CHAT_MODEL_OPTIONS)[number]['id']
+
+/** 两个模型在网关上公布的推理档位，没有 medium，也没有关闭。 */
+export const THINKING_EFFORTS = ['low', 'high', 'max'] as const
+export type ThinkingEffort = (typeof THINKING_EFFORTS)[number]
+export const DEFAULT_THINKING_EFFORT: ThinkingEffort = 'high'
+
+export const isChatModelId = (value: string | null): value is ChatModelId =>
+  CHAT_MODEL_OPTIONS.some((option) => option.id === value)
+
+export const isThinkingEffort = (value: string | null): value is ThinkingEffort =>
+  THINKING_EFFORTS.some((effort) => effort === value)
+
+export const modelRequiresThinking = (model: string) => model === GLM_MODEL_ID
+
+export const modelSupportsImages = (model: string) => model !== GLM_MODEL_ID
+
+/** 快照或选择不受支持时回退到 DeepSeek V4.1 Flash。 */
+export const OPENCODE_ONLY_MODEL = DEEPSEEK_MODEL_ID
+
+/** 未记录模型时的默认值。实际请求使用设置里选中的模型。 */
 export const CHAT_MODEL = IS_OPENCODE ? OPENCODE_ONLY_MODEL : DEFAULT_MODEL
 
 import type { ClientTool } from './types.js'
@@ -96,8 +120,16 @@ export const CLIENT_STS2_TOOL: ClientTool = {
       asc_min: { type: 'integer', description: '最低进阶等级' },
       asc_max: { type: 'integer', description: '最高进阶等级' },
       version: { type: 'string', description: '游戏版本，如 v0.113；不确定时先查 versions' },
-      name: { type: 'string', description: '卡牌名或玩家名，用于 card / player-search / player-profile' },
+      name: {
+        type: 'string',
+        description: '卡牌名或玩家名，用于 card / player-search / player-profile',
+      },
       run_id: { type: 'integer', description: '对局 ID，用于 command=run' },
+      level: {
+        type: 'integer',
+        enum: [1, 2, 3],
+        description: '卡片层级：1 简洁、2 标准、3 详细；不确定时省略，由用户问题自动判断',
+      },
       type: {
         type: 'string',
         enum: ['normal', 'elite', 'boss', 'event', 'shop', 'rest'],

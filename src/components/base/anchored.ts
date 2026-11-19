@@ -18,6 +18,7 @@ export type AnchoredPosition = {
   top: number
   left?: number
   right?: number
+  width?: number
   maxHeight?: number
 }
 
@@ -106,6 +107,7 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
       previous.top === next.top &&
       previous.left === next.left &&
       previous.right === next.right &&
+      previous.width === next.width &&
       previous.maxHeight === next.maxHeight
         ? previous
         : next
@@ -146,12 +148,24 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
     const available = Math.max(0, resolved === 'top' ? spaceAbove : spaceBelow)
     // 内容比可用空间小时按内容收口，避免浮层留出多余空白
     const height = Math.max(40, Math.min(maxHeight, available, floating.scrollHeight + 2))
+    const top =
+      resolved === 'top'
+        ? Math.max(VIEWPORT_PADDING, rect.top - offset - height)
+        : rect.bottom + offset
+    // 用尚未收窄时的边框盒宽度。scrollWidth 不含边框，写回 width 会把文字挤换行。
+    // 右对齐时优先贴触发器右缘，放不下就向右挪，整块留在视口里。
+    const width = Math.min(
+      Math.ceil(floating.getBoundingClientRect().width),
+      window.innerWidth - VIEWPORT_PADDING * 2
+    )
+    const preferredLeft =
+      align === 'end'
+        ? rect.right - width + alignOffset
+        : alignLeft(rect, width, align, alignOffset)
     applyPosition({
-      top:
-        resolved === 'top'
-          ? Math.max(VIEWPORT_PADDING, rect.top - offset - height)
-          : rect.bottom + offset,
-      right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
+      top,
+      left: clampLeft(preferredLeft, width),
+      width,
       maxHeight: height,
     })
   }, [align, alignOffset, applyPosition, floatingRef, getAnchor, maxHeight, minSpace, offset, side])

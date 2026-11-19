@@ -1,15 +1,23 @@
 import { create } from 'zustand'
+import { showToast } from '../../components/base/toastState.js'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { CHAT_MODEL, CLIENT_SEARCH_TOOL, CLIENT_STS2_TOOL, IS_OPENCODE } from '../api/provider.js'
+import {
+  CLIENT_SEARCH_TOOL,
+  CLIENT_STS2_TOOL,
+  IS_OPENCODE,
+  isChatModelId,
+  modelRequiresThinking,
+  modelSupportsImages,
+  type ChatModelId,
+} from '../api/provider.js'
 import { defaultSystemPrompt } from './systemPrompt.js'
 import { getExtractedFile } from '../extractedFiles.js'
 import { getInlineFile } from '../inlineFiles.js'
 import { searchWeb, type SearchResult } from '../api/search.js'
-import { querySts2, type Sts2CardTemplate } from '../api/sts2.js'
+import { querySts2, type Sts2CardLevel, type Sts2CardTemplate } from '../api/sts2.js'
 import type {
   AssistantBlockParam,
-  ChatModel,
   ClientToolResultBlockParam,
   CreateMessageRequest,
   MessageParam,
@@ -45,8 +53,21 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** 默认模型由构建配置决定；OpenCode 环境固定为 DeepSeek V4.1 Flash 1017 */
-const MODEL: ChatModel = CHAT_MODEL
+const selectedModel = (snapshot?: string | null): ChatModelId => {
+  if (snapshot && isChatModelId(snapshot)) {
+    return snapshot
+  }
+  return useSettings.getState().chatModel
+}
+
+/** GLM-5.3 不接受图片。返回 true 表示已拦截并提示。 */
+const refuseImages = (model: string | null | undefined, files: { isImage: boolean }[]) => {
+  if (modelSupportsImages(selectedModel(model)) || !files.some((file) => file.isImage)) {
+    return false
+  }
+  showToast({ key: 'glmImagesUnsupported' })
+  return true
+}
 /** 每次请求使用的系统提示词：优先用户自定义，否则按深度思考开关生成默认值 */
 const resolveSystemPrompt = (thinking: boolean): string => {
   const custom = useSettings.getState().systemPrompt?.trim()
@@ -281,13 +302,15 @@ export const bindChatPersistence = () => {
 
 /** 按当前开关创建回复：深度思考对应 thinking，搜索/杀戮尖塔控制工具声明。 */
 const createReply = (): AssistantMessage => {
-  const { thinking, search, sts2 } = useSettings.getState()
+  const { thinking, search, sts2, thinkingEffort } = useSettings.getState()
+  const model = selectedModel()
   return {
     id: createId(),
     role: 'assistant',
     createdAt: Date.now(),
-    model: MODEL,
-    thinking,
+    model,
+    thinking: modelRequiresThinking(model) || thinking,
+    thinkingEffort,
     search,
     sts2,
     prefix: true,
@@ -581,6 +604,9 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   const { text, files } = prepared
+  if (refuseImages(null, files)) {
+    return false
+  }
   const now = Date.now()
   let sessionId = targetSessionId
   if (
@@ -658,6 +684,9 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
   if (question?.role !== 'user' || path[index]?.role !== 'assistant') {
     return
   }
+  if (refuseImages(null, question.files)) {
+    return
+  }
   const history = path.slice(0, index - 1)
   const reply = createReply()
   updateSession(sessionId, (s) => ({
@@ -682,6 +711,9 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
   const previous = path[index]
   const text = content.trim()
   if (previous?.role !== 'user' || (!text && previous.files.length === 0)) {
+    return false
+  }
+  if (refuseImages(null, previous.files)) {
     return false
   }
   const question: UserMessage = {
@@ -732,12 +764,17 @@ export const continueReply = (sessionId: string, messageId: string) => {
   ) {
     return
   }
-  const { thinking, search, sts2 } = useSettings.getState()
+  const { thinking, search, sts2, thinkingEffort } = useSettings.getState()
+  const model = selectedModel(previous.model)
+  if (refuseImages(model, question.files)) {
+    return
+  }
   const reply: AssistantMessage = {
     ...previous,
-    // 未记录请求配置的回复，续写时使用默认模型和当前开关。
-    model: previous.model ?? MODEL,
-    thinking: previous.thinking ?? thinking,
+    // 未记录请求配置的回复，续写时使用当前模型和当前开关。
+    model,
+    thinking: modelRequiresThinking(model) || (previous.thinking ?? thinking),
+    thinkingEffort: previous.thinkingEffort ?? thinkingEffort,
     search: previous.search ?? search,
     sts2: previous.sts2 ?? sts2,
     status: 'pending',
@@ -769,6 +806,9 @@ export const retryUpload = (sessionId: string, messageId: string) => {
     previous?.role !== 'assistant' ||
     previous.error?.kind !== 'upload'
   ) {
+    return
+  }
+  if (refuseImages(previous.model, question.files)) {
     return
   }
   const reply: AssistantMessage = { ...previous, status: 'pending', error: undefined }
@@ -892,11 +932,7 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   for (const [user] of getContextRounds(request.history).toReversed()) {
     for (const file of user.files) {
       // OpenCode 的附件即使已有 inline:/extract: 前缀，也要检查缓存是否还在
-      if (
-        (IS_OPENCODE || !file.serverId) &&
-        !serverIds.has(file.id) &&
-        !pending.has(file.id)
-      ) {
+      if ((IS_OPENCODE || !file.serverId) && !serverIds.has(file.id) && !pending.has(file.id)) {
         pending.set(file.id, file)
       }
     }
@@ -1017,22 +1053,31 @@ const applyLocalTitle = (sessionId: string) => {
     return
   }
   const first = session.messages.find(
-    (message): message is UserMessage =>
-      message.role === 'user' && message.content.trim() !== ''
+    (message): message is UserMessage => message.role === 'user' && message.content.trim() !== ''
   )
   if (!first) {
     return
   }
   const title = first.content.trim().replace(/\s+/g, ' ').slice(0, 40)
-  updateSession(sessionId, (current) =>
-    current.title ? current : { ...current, title }
-  )
+  updateSession(sessionId, (current) => (current.title ? current : { ...current, title }))
 }
 
 /** 单条回复最多执行几轮客户端工具，避免模型无限调用 */
 const MAX_TOOL_ROUNDS = 3
 /** 回传给模型的搜索结果上限，防止上下文膨胀 */
 const MAX_TOOL_RESULT_CHARS = 12000
+/** 按用户问题推断卡片层级：1 简洁、2 标准、3 详细 */
+const inferCardLevel = (question: string): Sts2CardLevel => {
+  const text = question.toLowerCase()
+  if (/详细|完整|全部|每一局|所有|深入|分析|对比|趋势|逐局|展开/.test(text)) {
+    return 3
+  }
+  if (/简单|一句|概览|多少|是什么|排名|前几|top|简要/.test(text)) {
+    return 1
+  }
+  return 2
+}
+
 /** 杀戮尖塔命令的中文展示名 */
 const STS2_COMMAND_LABELS: Record<string, string> = {
   overview: '总览',
@@ -1138,6 +1183,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           latestReminder
         )
         const apiKey = useSettings.getState().apiKey ?? ''
+        const questionText = prepared.question.content
         const blockIndexes = new Map<number, number>()
         // 客户端工具循环：search_web / sts2_query 可能连续调用多次
         for (let round = 0; ; round += 1) {
@@ -1155,13 +1201,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             { id: string; name: string; json: string; input: unknown }
           >()
           let roundText = ''
+          const model = selectedModel(initial.model)
+          const thinkingOn = modelRequiresThinking(model) || Boolean(initial.thinking)
           const events = streamMessage(
             apiKey,
             {
-              model: initial.model ?? MODEL,
-              system: resolveSystemPrompt(initial.thinking ?? false),
+              model,
+              system: resolveSystemPrompt(thinkingOn),
               messages,
-              thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
+              thinking: { type: thinkingOn ? 'enabled' : 'disabled' },
+              effort: initial.thinkingEffort ?? useSettings.getState().thinkingEffort,
               safety_check: SAFETY_CHECK,
               tools,
               ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
@@ -1170,10 +1219,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           )
           for await (const event of events) {
             receivedContent ||= event.type === 'content_block_start'
-            if (
-              event.type === 'content_block_start' &&
-              event.content_block.type === 'tool_use'
-            ) {
+            if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
               pendingTools.set(event.index, {
                 id: event.content_block.id,
                 name: event.content_block.name,
@@ -1188,10 +1234,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               if (pending) {
                 pending.json += event.delta.partial_json
               }
-            } else if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
+            } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
               roundText += event.delta.text
             }
             if (
@@ -1246,8 +1289,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             })
 
             if (call.name === 'search_web') {
-              const query =
-                typeof input.query === 'string' ? input.query.trim().slice(0, 200) : ''
+              const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : ''
               if (!query) {
                 toolResults.push({
                   type: 'tool_result',
@@ -1317,9 +1359,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             }
 
             // 非搜索工具：先插入展示块，让链条显示「查询中」
-            const labelParts: string[] = [
-              call.name === 'sts2_query' ? '杀戮尖塔' : call.name,
-            ]
+            const labelParts: string[] = [call.name === 'sts2_query' ? '杀戮尖塔' : call.name]
             if (call.name === 'sts2_query') {
               if (typeof input.command === 'string' && input.command.trim()) {
                 const command = input.command.trim()
@@ -1358,10 +1398,11 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
 
             let text = ''
             let ok = false
-            let card: { template: Sts2CardTemplate; data: unknown } | undefined
+            let card:
+              | { template: Sts2CardTemplate; level: Sts2CardLevel; data: unknown }
+              | undefined
             if (call.name === 'sts2_query') {
-              const command =
-                typeof input.command === 'string' ? input.command.trim() : ''
+              const command = typeof input.command === 'string' ? input.command.trim() : ''
               // 把扁平参数翻译成 sts2_api.py 的 CLI 参数，避免模型自己拼 flag
               const args: string[] = []
               const addText = (flag: string, value: unknown) => {
@@ -1401,8 +1442,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                   result.data &&
                   ['profile', 'cards', 'relics', 'run', 'overview'].includes(template)
                 ) {
+                  const requested = input.level
+                  const level: Sts2CardLevel =
+                    requested === 1 || requested === 2 || requested === 3
+                      ? requested
+                      : inferCardLevel(questionText)
                   card = {
                     template: template as Sts2CardTemplate,
+                    level,
                     data: result.data,
                   }
                   if (command === 'run') {
@@ -1437,8 +1484,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                           .join('\n')
                       : text.slice(0, 6000)
                   } else {
-                    text +=
-                      '\n\n（界面已展示固定卡片，回答用 2-3 句总结即可，不要重复表格。）'
+                    text += '\n\n（界面已展示固定卡片，回答用 2-3 句总结即可，不要重复表格。）'
                   }
                 }
               } catch (error) {
@@ -1471,6 +1517,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                     type: 'sts2_card',
                     id: `card_${call.id}`,
                     template: card.template,
+                    level: card.level,
                     data: card.data,
                   },
                 ],

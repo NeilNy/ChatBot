@@ -78,7 +78,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         />
       ) : null}
       {view.cards.map((card) => (
-        <Sts2CardView key={card.key} template={card.template} data={card.data} />
+        <Sts2CardView key={card.key} template={card.template} level={card.level} data={card.data} />
       ))}
       {waiting ? (
         <div className={styles.waiting}>

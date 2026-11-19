@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import type { TtsVoice } from './api/speech.js'
-import { API_PROVIDER } from './api/provider.js'
+import {
+  API_PROVIDER,
+  isChatModelId,
+  isThinkingEffort,
+  modelRequiresThinking,
+  type ChatModelId,
+  type ThinkingEffort,
+} from './api/provider.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
 export type Locale = 'zh-CN' | 'en-US'
@@ -8,13 +15,15 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：API Key、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
+/** 本机设置，存 localStorage：API Key、语言、主题、位置、朗读音色、模型、思考强度与开关、侧边栏收起状态 */
 type Settings = {
   apiKey: string | null
   locale: Locale
   themePreference: ThemePreference
   location: UserLocation | null
   ttsVoice: TtsVoice
+  chatModel: ChatModelId
+  thinkingEffort: ThinkingEffort
   thinking: boolean
   search: boolean
   sts2: boolean
@@ -28,6 +37,8 @@ const KEYS = {
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
   ttsVoice: 'chat-demo:tts-voice',
+  chatModel: 'chat-demo:chat-model',
+  thinkingEffort: 'chat-demo:thinking-effort',
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   sts2: 'chat-demo:sts2',
@@ -92,6 +103,18 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+/** 只接受网关上的两个模型，其余（含旧值）回到 DeepSeek V4.1 Flash */
+const initialChatModel = (): ChatModelId => {
+  const saved = read(KEYS.chatModel)
+  return isChatModelId(saved) ? saved : 'deepseek-v4.1-flash'
+}
+
+/** 思考强度默认高。网关只有 low、high、max。 */
+const initialThinkingEffort = (): ThinkingEffort => {
+  const saved = read(KEYS.thinkingEffort)
+  return isThinkingEffort(saved) ? saved : 'high'
+}
+
 /** 自定义系统提示词；空白内容视为未设置 */
 const initialSystemPrompt = (): string | null => {
   const saved = read(KEYS.systemPrompt)
@@ -107,13 +130,21 @@ const initialApiKey = (): string | null => {
   return read(KEYS.apiKey)
 }
 
+const initialModel = initialChatModel()
+const initialThinkingOn = modelRequiresThinking(initialModel) || read(KEYS.thinking) === 'true'
+if (modelRequiresThinking(initialModel)) {
+  write(KEYS.thinking, 'true')
+}
+
 export const useSettings = create<Settings>(() => ({
   apiKey: initialApiKey(),
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
   ttsVoice: initialTtsVoice(),
-  thinking: read(KEYS.thinking) === 'true',
+  chatModel: initialModel,
+  thinkingEffort: initialThinkingEffort(),
+  thinking: initialThinkingOn,
   search: read(KEYS.search) === 'true',
   sts2: read(KEYS.sts2) === 'true',
   systemPrompt: initialSystemPrompt(),
@@ -146,7 +177,25 @@ export const setApiKey = (apiKey: string | null) => {
   useSettings.setState({ apiKey })
 }
 
+export const setChatModel = (chatModel: ChatModelId) => {
+  write(KEYS.chatModel, chatModel)
+  if (modelRequiresThinking(chatModel)) {
+    write(KEYS.thinking, 'true')
+    useSettings.setState({ chatModel, thinking: true })
+    return
+  }
+  useSettings.setState({ chatModel })
+}
+
+export const setThinkingEffort = (thinkingEffort: ThinkingEffort) => {
+  write(KEYS.thinkingEffort, thinkingEffort)
+  useSettings.setState({ thinkingEffort })
+}
+
 export const setThinking = (thinking: boolean) => {
+  if (!thinking && modelRequiresThinking(useSettings.getState().chatModel)) {
+    return
+  }
   write(KEYS.thinking, String(thinking))
   useSettings.setState({ thinking })
 }
