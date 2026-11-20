@@ -166,6 +166,13 @@ const COPY = {
 
 type Copy = typeof COPY.zh
 
+export type Sts2CardAction = {
+  id: string
+  label: string
+  tone?: 'primary' | 'ghost'
+  onSelect: () => void
+}
+
 const useCopy = (): Copy => {
   const locale = useSettings((state) => state.locale)
   return locale === 'en-US' ? COPY.en : COPY.zh
@@ -228,12 +235,14 @@ const Shell = ({
   subtitle,
   badge,
   control,
+  footer,
   children,
 }: {
   title: string
   subtitle?: string
   badge?: string
   control?: ReactNode
+  footer?: ReactNode
   children: ReactNode
 }) => (
   <section className={styles.card}>
@@ -252,6 +261,7 @@ const Shell = ({
       {subtitle ? <div className={styles.subtitle}>{subtitle}</div> : null}
     </header>
     <div className={styles.body}>{children}</div>
+    {footer ? <div className={styles.footer}>{footer}</div> : null}
   </section>
 )
 
@@ -300,16 +310,38 @@ const RecordItem = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
+const ActionBar = ({ actions }: { actions?: Sts2CardAction[] }) => {
+  if (!actions?.length) {
+    return null
+  }
+  return (
+    <div className={styles.actions}>
+      {actions.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className={clsx(styles.action, item.tone === 'primary' && styles.actionPrimary)}
+          onClick={item.onSelect}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const ProfileCard = ({
   value,
   locale,
   level,
   control,
+  actions,
 }: {
   value: Sts2Profile
   locale: string
   level: Sts2CardLevel
   control: ReactNode
+  actions?: Sts2CardAction[]
 }) => {
   const c = useCopy()
   const s = value.summary ?? {}
@@ -326,6 +358,7 @@ const ProfileCard = ({
       subtitle={fill(c.runs, { n: s.total_runs ?? 0 })}
       badge={fill(c.ascension, { a: s.max_ascension_victory ?? 0 })}
       control={control}
+      footer={<ActionBar actions={actions} />}
     >
       <div className={styles.hero}>
         <div>
@@ -467,12 +500,14 @@ const RankingCard = ({
   locale,
   level,
   control,
+  actions,
 }: {
   template: 'cards' | 'relics'
   data: Sts2CardsData | Sts2RelicsData
   locale: string
   level: Sts2CardLevel
   control: ReactNode
+  actions?: Sts2CardAction[]
 }) => {
   const c = useCopy()
   const cards = (data as Sts2CardsData).cards ?? []
@@ -488,6 +523,7 @@ const RankingCard = ({
       title={template === 'cards' ? c.cards : c.relics}
       subtitle={subtitle !== '—' ? subtitle : undefined}
       control={control}
+      footer={<ActionBar actions={actions} />}
     >
       <div className={styles.table}>
         <div className={`${styles.tableRow} ${styles.tableHeader}`}>
@@ -579,11 +615,13 @@ const RunCard = ({
   locale,
   level,
   control,
+  actions,
 }: {
   data: Sts2RunData
   locale: string
   level: Sts2CardLevel
   control: ReactNode
+  actions?: Sts2CardAction[]
 }) => {
   const c = useCopy()
   const run = data.run
@@ -600,6 +638,7 @@ const RunCard = ({
         .join(' · ')}
       badge={run.is_victory ? c.victory : run.abandoned ? c.abandoned : c.defeat}
       control={control}
+      footer={<ActionBar actions={actions} />}
     >
       <div className={styles.statGrid}>
         <Stat label={c.floorLabel} value={fill(c.floor, { n: run.floor_reached ?? 0 })} />
@@ -651,11 +690,13 @@ const OverviewCard = ({
   locale,
   level,
   control,
+  actions,
 }: {
   data: Sts2OverviewData
   locale: string
   level: Sts2CardLevel
   control: ReactNode
+  actions?: Sts2CardAction[]
 }) => {
   const c = useCopy()
   const characters = data.character_win_rates ?? []
@@ -665,6 +706,7 @@ const OverviewCard = ({
       title={c.overview}
       subtitle={data.unique_players ? `${data.unique_players.toLocaleString()} ${c.players}` : undefined}
       control={control}
+      footer={<ActionBar actions={actions} />}
     >
       <div className={styles.statGrid}>
         <Stat label={c.totalRuns} value={(data.total_runs ?? 0).toLocaleString()} />
@@ -729,19 +771,30 @@ export const Sts2CardView = ({
   template,
   level: initialLevel,
   data,
+  onLevelChange,
+  actions,
 }: {
   template: Sts2CardTemplate
   level: Sts2CardLevel
   data: unknown
+  /** 传入时由 A2UI dataModel 控制层级；不传则保持旧的本地 state 行为。 */
+  onLevelChange?: (level: Sts2CardLevel) => void
+  actions?: Sts2CardAction[]
 }) => {
   const locale = useSettings((state) => state.locale)
-  const [level, setLevel] = useState<Sts2CardLevel>(initialLevel)
+  const [localLevel, setLocalLevel] = useState<Sts2CardLevel>(initialLevel)
+  const level = onLevelChange ? initialLevel : localLevel
 
   useEffect(() => {
-    setLevel(initialLevel)
+    setLocalLevel(initialLevel)
   }, [initialLevel])
 
-  const control = <Segmented value={level} onChange={setLevel} />
+  const changeLevel = (next: Sts2CardLevel) => {
+    setLocalLevel(next)
+    onLevelChange?.(next)
+  }
+
+  const control = <Segmented value={level} onChange={changeLevel} />
 
   switch (template) {
     case 'profile':
@@ -751,6 +804,7 @@ export const Sts2CardView = ({
           locale={locale}
           level={level}
           control={control}
+          actions={actions}
         />
       )
     case 'cards':
@@ -762,10 +816,19 @@ export const Sts2CardView = ({
           locale={locale}
           level={level}
           control={control}
+          actions={actions}
         />
       )
     case 'run':
-      return <RunCard data={data as Sts2RunData} locale={locale} level={level} control={control} />
+      return (
+        <RunCard
+          data={data as Sts2RunData}
+          locale={locale}
+          level={level}
+          control={control}
+          actions={actions}
+        />
+      )
     case 'overview':
       return (
         <OverviewCard
@@ -773,6 +836,7 @@ export const Sts2CardView = ({
           locale={locale}
           level={level}
           control={control}
+          actions={actions}
         />
       )
     default:

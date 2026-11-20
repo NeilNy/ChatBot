@@ -75,6 +75,7 @@ export const AssistantMessage = memo(function AssistantMessage({
           disableLink={false}
           sources={view.sources}
           cards={view.cards}
+          sessionId={sessionId}
         />
       ) : null}
       {waiting ? (

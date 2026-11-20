@@ -33,6 +33,7 @@ The output is written to `dist/`. Deploy it to a static web server or open `dist
 - Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
 - Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
+- Slay the Spire 2 analytics cards rendered as [A2UI 1.0](docs/a2ui.md) surfaces with a custom catalog, data binding, and card actions.
 - Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.
 
 ## Data and storage

@@ -20,6 +20,7 @@ export const Markdown = memo(function Markdown({
   disableLink,
   sources,
   cards = [],
+  sessionId = '',
 }: {
   content: string
   loading: boolean
@@ -28,6 +29,7 @@ export const Markdown = memo(function Markdown({
   disableLink: boolean
   sources?: Source[]
   cards?: readonly Sts2CardPart[]
+  sessionId?: string
 }) {
   const scrollToBottom = useScrollToBottom()
   const throttledMarkdown = useThrottleMarkdownRender(content, loading)
@@ -49,6 +51,7 @@ export const Markdown = memo(function Markdown({
       ast={ast}
       loading={loading}
       cards={cards}
+      sessionId={sessionId}
       onUpdate={scrollToBottom}
     />
   ) : null

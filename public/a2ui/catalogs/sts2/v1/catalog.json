@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.cornhub.art/a2ui/catalogs/sts2/v1/catalog.json",
+  "catalogId": "https://agent.cornhub.art/a2ui/catalogs/sts2/v1/catalog.json",
+  "protocolVersion": "1.0",
+  "title": "DeepSuck STS2 Catalog",
+  "description": "Fixed A2UI 1.0 components for Slay the Spire 2 analytics. Components never accept HTML or CSS.",
+  "instructions": "Use exactly one Sts2*Card component per surface. Put the analytics payload in `data`, bind `level` to /level, and pass optional actions as A2UI Action objects.",
+  "components": {
+    "Sts2ProfileCard": {
+      "type": "object",
+      "description": "Player profile: win rate, records, characters, recent runs.",
+      "properties": {
+        "component": {
+          "const": "Sts2ProfileCard"
+        },
+        "level": {
+          "$ref": "common_types.json#/$defs/DynamicNumber"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "$ref": "#/$defs/Sts2Actions"
+        }
+      },
+      "required": [
+        "component",
+        "level",
+        "data"
+      ]
+    },
+    "Sts2CardsCard": {
+      "type": "object",
+      "description": "Card ranking: Skada score, pick/hold, win rates and delta.",
+      "properties": {
+        "component": {
+          "const": "Sts2CardsCard"
+        },
+        "level": {
+          "$ref": "common_types.json#/$defs/DynamicNumber"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "$ref": "#/$defs/Sts2Actions"
+        }
+      },
+      "required": [
+        "component",
+        "level",
+        "data"
+      ]
+    },
+    "Sts2RelicsCard": {
+      "type": "object",
+      "description": "Relic ranking: hold rate, pick rate and win rates.",
+      "properties": {
+        "component": {
+          "const": "Sts2RelicsCard"
+        },
+        "level": {
+          "$ref": "common_types.json#/$defs/DynamicNumber"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "$ref": "#/$defs/Sts2Actions"
+        }
+      },
+      "required": [
+        "component",
+        "level",
+        "data"
+      ]
+    },
+    "Sts2RunCard": {
+      "type": "object",
+      "description": "Single run: result, floor timeline, combats and final relics.",
+      "properties": {
+        "component": {
+          "const": "Sts2RunCard"
+        },
+        "level": {
+          "$ref": "common_types.json#/$defs/DynamicNumber"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "$ref": "#/$defs/Sts2Actions"
+        }
+      },
+      "required": [
+        "component",
+        "level",
+        "data"
+      ]
+    },
+    "Sts2OverviewCard": {
+      "type": "object",
+      "description": "Meta overview: total runs, win rate, characters, deaths and hardest encounters.",
+      "properties": {
+        "component": {
+          "const": "Sts2OverviewCard"
+        },
+        "level": {
+          "$ref": "common_types.json#/$defs/DynamicNumber"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "$ref": "#/$defs/Sts2Actions"
+        }
+      },
+      "required": [
+        "component",
+        "level",
+        "data"
+      ]
+    }
+  },
+  "$defs": {
+    "Sts2Actions": {
+      "type": "array",
+      "description": "Optional action row rendered below the card.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "labelEn": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "ghost"
+            ]
+          },
+          "action": {
+            "$ref": "common_types.json#/$defs/Action"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "action"
+        ]
+      }
+    },
+    "anyComponent": {
+      "oneOf": [
+        {
+          "$ref": "#/components/Sts2ProfileCard"
+        },
+        {
+          "$ref": "#/components/Sts2CardsCard"
+        },
+        {
+          "$ref": "#/components/Sts2RelicsCard"
+        },
+        {
+          "$ref": "#/components/Sts2RunCard"
+        },
+        {
+          "$ref": "#/components/Sts2OverviewCard"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "component"
+      }
+    },
+    "anyFunction": {
+      "not": {}
+    }
+  }
+}

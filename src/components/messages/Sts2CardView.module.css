@@ -552,13 +552,62 @@
   font-variant-numeric: tabular-nums;
 }
 
+.footer {
+  padding: 0 12px 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.action {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.action:hover {
+  background: var(--bg-hover);
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+.actionPrimary {
+  border-color: transparent;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.actionPrimary:hover {
+  background: var(--text);
+  opacity: 0.86;
+}
+
 @media not all and (min-width: 680px) {
   .card {
     width: 100%;
   }
 
   .header,
-  .body {
+  .body,
+  .footer {
     padding-right: 14px;
     padding-left: 14px;
   }

@@ -301,7 +301,7 @@ export const bindChatPersistence = () => {
 }
 
 /** 按当前开关创建回复：深度思考对应 thinking，搜索/杀戮尖塔控制工具声明。 */
-const createReply = (): AssistantMessage => {
+const createReply = (force?: { search?: boolean; sts2?: boolean }): AssistantMessage => {
   const { thinking, search, sts2, thinkingEffort } = useSettings.getState()
   const model = selectedModel()
   return {
@@ -311,8 +311,8 @@ const createReply = (): AssistantMessage => {
     model,
     thinking: modelRequiresThinking(model) || thinking,
     thinkingEffort,
-    search,
-    sts2,
+    search: force?.search ?? search,
+    sts2: force?.sts2 ?? sts2,
     prefix: true,
     status: 'pending',
     blocks: [],
@@ -591,19 +591,22 @@ const removeSessionData = async (id: string): Promise<boolean> => {
 
 export const stopReply = (sessionId: string) => getStreamController(sessionId)?.abort()
 
+type OutgoingFile = FileAttachment & { serverId: string; blob: Blob }
+
 /**
- * 提交指定会话的最新草稿；null 表示新建会话。
- * 同步接收成功才清空草稿，附件原件由会话接管；保存失败仍通过保存入口重试。
+ * 真正的入队：文本或附件已经准备好，追加用户消息并开始流式回答。
+ * `clearComposerDraft` 只对输入框发送为 true；卡片动作不能清掉用户正在写的草稿。
  */
-export const sendMessage = (targetSessionId: string | null) => {
+const submitMessage = (
+  targetSessionId: string | null,
+  text: string,
+  files: OutgoingFile[],
+  clearComposerDraft: boolean,
+  force?: { search?: boolean; sts2?: boolean }
+) => {
   if (get().importingHistory || !get().ready) {
     return false
   }
-  const prepared = prepareDraftMessage(getDraft(targetSessionId), useUploads.getState().tasks)
-  if (!prepared) {
-    return false
-  }
-  const { text, files } = prepared
   if (refuseImages(null, files)) {
     return false
   }
@@ -651,7 +654,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     })),
     createdAt: now,
   }
-  const reply = createReply()
+  const reply = createReply(force)
   updateSession(sessionId, (session) => ({
     ...appendBranch(session, history.at(-1)?.id ?? null, [question, reply]),
     updatedAt: now,
@@ -663,9 +666,42 @@ export const sendMessage = (targetSessionId: string | null) => {
     ])
   }
   persist(sessionId)
-  clearSentDraft(targetSessionId)
+  if (clearComposerDraft) {
+    clearSentDraft(targetSessionId)
+  }
   void streamReply(sessionId, reply, { history, question })
   return true
+}
+
+/**
+ * 提交指定会话的最新草稿；null 表示新建会话。
+ * 同步接收成功才清空草稿，附件原件由会话接管；保存失败仍通过保存入口重试。
+ */
+export const sendMessage = (targetSessionId: string | null) => {
+  if (get().importingHistory || !get().ready) {
+    return false
+  }
+  const prepared = prepareDraftMessage(getDraft(targetSessionId), useUploads.getState().tasks)
+  if (!prepared) {
+    return false
+  }
+  return submitMessage(targetSessionId, prepared.text, prepared.files, true)
+}
+
+/**
+ * 卡片动作入口：把 A2UI action 适配出的文本作为一条普通用户消息发送。
+ * 与输入框发送共用同一条流式链路，但不清空草稿。
+ */
+export const sendPrompt = (
+  targetSessionId: string | null,
+  text: string,
+  force?: { search?: boolean; sts2?: boolean }
+) => {
+  const content = text.trim()
+  if (!content) {
+    return false
+  }
+  return submitMessage(targetSessionId, content, [], false, force)
 }
 
 /** 重新生成当前路径上的回答：在原问题下新增版本，不覆盖旧回答和后续对话。 */
@@ -1078,6 +1114,114 @@ const inferCardLevel = (question: string): Sts2CardLevel => {
   return 2
 }
 
+type RunTimelineEntry = {
+  floor?: number
+  room_type?: string
+  room_type_display_name?: { zh?: string; en?: string }
+  hp_before?: number
+  hp_after?: number
+  combat?: {
+    encounter?: string
+    encounter_display_name?: { zh?: string; en?: string }
+    turns?: number
+    won?: boolean
+    total_dmg_taken?: number
+    total_dmg_dealt?: number
+  }
+}
+
+type RunDetailLike = {
+  run?: {
+    run_id?: number
+    player_name?: string
+    display_name?: { zh?: string; en?: string }
+    ascension?: number
+    is_victory?: boolean
+    abandoned?: boolean
+    death_cause?: string
+    death_cause_name?: { zh?: string; en?: string }
+    floor_reached?: number
+    duration_sec?: number
+    game_version?: string
+    created_at?: string
+  }
+  combats?: {
+    floor?: number
+    encounter?: string
+    encounter_display_name?: { zh?: string; en?: string }
+    type?: string
+    enc_type?: string
+    turns?: number
+    won?: boolean
+  }[]
+  floor_timeline?: RunTimelineEntry[]
+  final_relics?: { relic_id?: string; display_name?: { zh?: string; en?: string } }[]
+  detail_expired?: boolean
+  detail_window_days?: number
+}
+
+/**
+ * 把对局数据压成给模型看的文本摘要。
+ * 卡片只能给用户看，模型看不到卡片内部的 JSON，所以这里必须包含
+ * 足以做归因分析的楼层时间线、战斗和最终遗物。
+ */
+const formatRunDigest = (data: RunDetailLike) => {
+  const run = data.run
+  if (!run) {
+    return ''
+  }
+  const lines = [
+    `对局 #${run.run_id ?? '—'}：${run.player_name ?? ''} ${run.display_name?.zh ?? ''} A${run.ascension ?? 0}`,
+    `结果：${run.is_victory ? '胜利' : run.abandoned ? '放弃' : '失败'}，${run.floor_reached ?? 0} 层，时长 ${Math.round((run.duration_sec ?? 0) / 60)} 分钟，${String(run.created_at ?? '').slice(0, 10)}${run.game_version ? `，版本 ${run.game_version}` : ''}`,
+  ]
+  if (run.death_cause) {
+    lines.push(`死因：${run.death_cause_name?.zh ?? run.death_cause}`)
+  }
+  const relics = (data.final_relics ?? [])
+    .map((relic) => relic.display_name?.zh ?? relic.relic_id)
+    .filter((name): name is string => Boolean(name))
+  if (relics.length > 0) {
+    lines.push(`最终遗物（${relics.length}）：${relics.join('、')}`)
+  }
+  const timeline = data.floor_timeline ?? []
+  if (timeline.length > 0) {
+    lines.push('', `楼层时间线（${timeline.length} 层）：`)
+    for (const entry of timeline) {
+      const parts = [
+        `${entry.floor ?? '—'}层`,
+        entry.room_type_display_name?.zh ?? entry.room_type ?? '—',
+      ]
+      if (entry.combat) {
+        const name =
+          entry.combat.encounter_display_name?.zh ?? entry.combat.encounter ?? '战斗'
+        parts.push(`${name} ${entry.combat.turns ?? '—'} 回合 ${entry.combat.won ? '胜' : '负'}`)
+        if (entry.combat.total_dmg_taken) {
+          parts.push(`受伤 ${entry.combat.total_dmg_taken}`)
+        }
+      }
+      if (entry.hp_before !== undefined || entry.hp_after !== undefined) {
+        parts.push(`HP ${entry.hp_before ?? '—'}→${entry.hp_after ?? '—'}`)
+      }
+      lines.push(`- ${parts.join(' · ')}`)
+    }
+  } else if ((data.combats?.length ?? 0) > 0) {
+    lines.push('', `战斗记录（${data.combats?.length ?? 0} 场）：`)
+    for (const combat of data.combats ?? []) {
+      const name = combat.encounter_display_name?.zh ?? combat.encounter ?? '战斗'
+      lines.push(
+        `- ${combat.floor ?? '—'}层 ${name} ${combat.type ?? combat.enc_type ?? ''} ${combat.turns ?? '—'} 回合 ${combat.won ? '胜' : '负'}`
+      )
+    }
+  }
+  if (data.detail_expired) {
+    lines.push(
+      '',
+      `注：该对局超过 ${data.detail_window_days ?? 3} 天，逐场战斗统计可能已过期；以上楼层时间线仍可用于判断掉血节点和路线。`
+    )
+  }
+  return lines.join('\n')
+}
+
 /** 杀戮尖塔命令的中文展示名 */
 const STS2_COMMAND_LABELS: Record<string, string> = {
   overview: '总览',
@@ -1468,39 +1612,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                   }
                   const cardField = JSON.stringify({ id: cardId, template, level, title })
                   if (command === 'run') {
-                    const runData = result.data as {
-                      run?: {
-                        run_id?: number
-                        player_name?: string
-                        display_name?: { zh?: string; en?: string }
-                        ascension?: number
-                        is_victory?: boolean
-                        abandoned?: boolean
-                        death_cause?: string
-                        death_cause_name?: { zh?: string; en?: string }
-                        floor_reached?: number
-                        duration_sec?: number
-                        created_at?: string
-                      }
-                      combats?: unknown[]
-                    }
-                    const run = runData.run
-                    text = run
-                      ? [
-                          `对局 #${run.run_id ?? '—'}：${run.player_name ?? ''} ${run.display_name?.zh ?? ''} A${run.ascension ?? 0}`,
-                          `结果：${run.is_victory ? '胜利' : run.abandoned ? '放弃' : '失败'}，${run.floor_reached ?? 0} 层，时长 ${Math.round((run.duration_sec ?? 0) / 60)} 分钟，${String(run.created_at ?? '').slice(0, 10)}`,
-                          run.death_cause
-                            ? `死因：${run.death_cause_name?.zh ?? run.death_cause}`
-                            : '',
-                          `战斗记录 ${Array.isArray(runData.combats) ? runData.combats.length : 0} 场（完整列表见卡片字段）。`,
-                        ]
-                          .filter(Boolean)
-                          .join('\n')
-                      : text.slice(0, 6000)
+                    const digest = formatRunDigest(result.data as RunDetailLike)
+                    text = digest || text.slice(0, 6000)
                   }
                   text +=
                     `\n\n[card] ${cardField}\n` +
-                    `如果需要在回答中展示这张卡片，请在正文最后单独输出 [[sts2-card:${cardId}]]；不需要展示就不要输出，也不要生成 HTML 或重复表格。`
+                    `这张卡片会编译成 A2UI 1.0 surface。如果需要在回答中展示，请在正文最后单独输出 [[sts2-card:${cardId}]]；不需要展示就不要输出，也不要生成 HTML 或重复表格。`
                 }
               } catch (error) {
                 text = `杀戮尖塔数据查询失败：${

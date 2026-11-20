@@ -228,11 +228,13 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
   className,
   loading = false,
   cards = [],
+  sessionId = '',
 }: {
   ast: Root
   className?: string
   loading?: boolean
   cards?: readonly Sts2CardPart[]
+  sessionId?: string
   /**
    * layoutEffect 之后触发 -> 进行页面滚动
    */
@@ -246,7 +248,7 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
 
   return useMemo(
     () => (
-      <Sts2CardProvider cards={cards}>
+      <Sts2CardProvider cards={cards} sessionId={sessionId}>
         <div className={clsx('ds-markdown', className)}>
           {/* 解析器在根节点下产出块级内容。 */}
           <MarkdownBlockContentOrDefinitionContent
@@ -256,6 +258,6 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
         </div>
       </Sts2CardProvider>
     ),
-    [className, ast.children, loading, cards]
+    [className, ast.children, loading, cards, sessionId]
   )
 })

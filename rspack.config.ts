@@ -147,7 +147,10 @@ export const createConfig = ({
         }),
       }),
       new rspack.CopyRspackPlugin({
-        patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
+        patterns: [
+          { from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' },
+          { from: path.resolve(root, 'public'), to: '.', noErrorOnMissing: true },
+        ],
       }),
     ],
     performance: { hints: false },
