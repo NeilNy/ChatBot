@@ -4,6 +4,7 @@ import { createComponentImplementation, type ReactCatalogComponent } from '@a2ui
 import { Catalog } from '@a2ui/web_core'
 import { CommonSchemas } from '@a2ui/web_core/v1_0'
 import { useSettings } from '../settings.js'
+import { STS2_CATALOG_ID } from './constants.js'
 import {
   Sts2CardView,
   type Sts2CardAction,
@@ -20,7 +21,7 @@ import type {
  * STS2 卡片目录。协议版本固定为 A2UI 1.0；catalogId 同时是前后端共享的目录标识。
  * 目录只暴露固定组件，模型不能输出 HTML/CSS，也不能创建目录之外的组件。
  */
-export const STS2_CATALOG_ID = 'https://agent.cornhub.art/a2ui/catalogs/sts2/v1/catalog.json'
+export { STS2_CATALOG_ID }
 
 const ActionSchema = z.object({
   id: z.string(),

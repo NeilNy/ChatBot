@@ -8,7 +8,7 @@ import type {
   Sts2RunData,
 } from '../api/sts2.js'
 import type { Sts2CardPart } from '../chat/types.js'
-import { STS2_CATALOG_ID } from './catalog.js'
+import { STS2_CATALOG_ID } from './constants.js'
 
 type CardAction = {
   id: string
