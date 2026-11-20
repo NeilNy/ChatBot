@@ -38,7 +38,7 @@ export const sts2ActionPrompt = (action: ActionPayload): string | null => {
         '1. 这局的关键转折点；',
         '2. 胜利或失败的主要原因；',
         '3. 2-3 个可以改进的决策。',
-        '不要重复卡片里已有的表格。',
+        '不要再次输出卡片标记，也不要重复卡片里已有的表格，直接给分析。',
       ].join('\n')
     }
     case 'sts2.open_run': {
@@ -63,15 +63,16 @@ export const sts2ActionPrompt = (action: ActionPayload): string | null => {
         '2. 最明显的短板；',
         '3. 角色偏好和近期趋势；',
         '4. 2-3 条具体提升建议。',
+        '不要再次输出卡片标记，直接给分析。',
       ].join('\n')
     }
     case 'sts2.analyze_character': {
       const character = str(ctx.character) || '全部角色'
       const board = ctx.board === 'relics' ? '遗物' : '卡牌'
-      return `请分析 ${character} 在当前版本的${board}环境：强势选择、陷阱选择，以及和社区平均水平的差距。先调用 sts2_query 获取最新排名。`
+      return `请分析 ${character} 在当前版本的${board}环境：强势选择、陷阱选择，以及和社区平均水平的差距。先调用 sts2_query 获取最新排名。不要再次输出卡片标记，直接给分析。`
     }
     case 'sts2.analyze_meta': {
-      return '请分析当前版本的环境总览：整体胜率、角色强弱、常见死因和高伤害遭遇，并指出 2-3 个最值得注意的趋势。先调用 sts2_query 的 overview 命令。'
+      return '请分析当前版本的环境总览：整体胜率、角色强弱、常见死因和高伤害遭遇，并指出 2-3 个最值得注意的趋势。先调用 sts2_query 的 overview 命令。不要再次输出卡片标记，直接给分析。'
     }
     default:
       return null
